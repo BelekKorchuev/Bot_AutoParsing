@@ -1,17 +1,8 @@
 from bs4 import BeautifulSoup
-from pycparser.ply.yacc import token
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
-from webdriver_manager.chrome import ChromeDriverManager
 import time
 from selenium.webdriver.support import expected_conditions as EC
-
-from DBManager import get_db_connection, insert_message_to_db, prepare_data_for_db
-
-# Настройка Selenium (установка драйвера Chrome)
-driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
 
 # Функция для получения и парсинга HTML-кода по предоставленной ссылке
 def parse_message_page(url, driver):
@@ -228,74 +219,3 @@ def parse_message_page(url, driver):
                     'Балансовая стоимость': "&&& ".join(balance_values)
                 })
     return data
-
-
-# Открытие страницы с сообщениями
-url = "https://old.bankrot.fedresurs.ru/Messages.aspx"  # Замените на URL вашей страницы
-driver.get(url)
-time.sleep(3)
-WebDriverWait(driver, 10).until(
-    EC.presence_of_element_located((By.CLASS_NAME, 'bank'))
-)
-
-# Получение HTML-кода страницы
-html = driver.page_source
-soup = BeautifulSoup(html, 'html.parser')
-table = soup.find('table', class_='bank')
-rows = table.find_all('tr')
-
-# Получаем подключение к базе данных
-connection = get_db_connection()
-
-# Ограничение количества сообщений для парсинга
-max_messages = 5
-current_count = 0
-
-for row in rows:
-    # if current_count >= max_messages:
-    #     break  #
-    cells = row.find_all('td')
-    if len(cells) >= 5:
-        raw_data = {
-            'date': cells[0].text.strip(),
-            'message_type': cells[1].text.strip(),
-            'debtor_name': cells[2].text.strip(),
-            'address': cells[3].text.strip(),
-            'arbiter_name': cells[4].text.strip()
-        }
-
-        message_type = cells[1].text.strip()
-        print(message_type)
-        if any(keyword in message_type for keyword in ['Сведения о заключении договора купли-продажи',
-                                               'Сообщение о результатах торгов',
-                                               'Объявление о проведении торгов',
-                                               'Отчет оценщика об оценке имущества должника']):
-
-            # Извлечение ссылки на сообщение
-            message_link_tag = row.find('a', href=True)
-            if message_link_tag:
-                message_link = "https://old.bankrot.fedresurs.ru" + message_link_tag['href']
-                print("Ссылка на сообщение:", message_link)
-
-                try:
-                    message_content  = parse_message_page(message_link, driver)
-                    raw_data['message_content'] = message_content
-                    raw_data['message_link'] = message_link
-                    # Подготовка данных перед вставкой в базу
-                    prepared_data = prepare_data_for_db(raw_data)
-                    print(raw_data)
-                    # Вставка данных в базу
-                    new_id = insert_message_to_db(prepared_data, connection)
-                    print(f"Данные успешно вставлены с ID: {new_id}")
-
-                    # current_count += 1
-                except Exception as e:
-                    print("Ошибка при парсинге страницы или вставке данных:", e)
-            else:
-                print("Ссылка не найдена в текущей строке.")
-        else:
-            print("нето")
-
-# Закрытие браузера после завершения работы
-driver.quit()
-connection.close()
