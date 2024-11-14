@@ -23,7 +23,7 @@ while True:
         time.sleep(0.5)
         continue
 
-    link = new_messages["message_link"]
+    link = new_messages["сообщение_ссылка"]
     try:
         message_content = parse_message_page(link, driver)
         new_messages['message_content'] = message_content
@@ -33,9 +33,8 @@ while True:
 
         # Вставка данных в базу
         new_id = insert_message_to_db(prepared_data, connection)
-        print(f"Данные успешно вставлены с ID: {new_id} \n\n")
     except Exception as e:
         print("Ошибка при парсинге страницы или вставке данных:", e)
 
-    print("Ожидание 0.5 секунды для следующего обновления...")
+    print("\n \n Ожидание 0.5 секунды для следующего обновления...")
     time.sleep(0.5)  # Задержка 0.5 секунды перед следующим циклом проверки

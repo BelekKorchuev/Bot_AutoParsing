@@ -1,4 +1,5 @@
 from bs4 import BeautifulSoup
+from pandas.plotting import table
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 import time
@@ -23,7 +24,6 @@ def parse_message_page(url, driver):
 
     # Извлечение заголовка сообщения
     title = soup.find('h1', class_='red_small').text.strip()
-    data['title'] = title
 
     # Основная информация
     table_main = soup.find('table', class_='headInfo')
@@ -69,8 +69,22 @@ def parse_message_page(url, driver):
         contract_numbers = []
         contract_dates = []
         prices = []
+        winner = []
 
-        lot_section = soup.find('div', string="Публикуемые сведения")
+        lot_platform = soup.find('div', string='Публикуемые сведения')
+        if lot_platform:
+            lot_table = lot_platform.find_next("table")
+            if lot_table:
+                lot_rows = lot_table.find_all('tr')
+                for row in lot_rows:
+                    cells = row.find_all('td')
+                    if len(cells) == 2:
+                        field = cells[0].text.strip()
+                        value = cells[1].text.strip()
+                        data[field] = value
+
+
+        lot_section = soup.find('div', class_="containerTitle msg")
         if lot_section:
             lot_table = lot_section.find_next("table")
             if lot_table:
@@ -84,6 +98,8 @@ def parse_message_page(url, driver):
                         contract_numbers.append(f'{cells[4].text.strip()}')
                         contract_dates.append(f'{cells[5].text.strip()}')
                         prices.append(f'{cells[6].text.strip()}')
+                        winner.append(f'{cells[8].text.strip()}')
+
 
                 data.update({
                     'Номер лота': "&&& ".join(lot_numbers),
@@ -91,11 +107,19 @@ def parse_message_page(url, driver):
                     'Сведения о заключении договора': "&&& ".join(agreements),
                     'Номер договора': "&&& ".join(contract_numbers),
                     'Дата заключения договора': "&&& ".join(contract_dates),
-                    'Цена приобретения имущества, руб.': "&&& ".join(prices),
+                    'Цена': "&&& ".join(prices),
+                    'Наименование покупателя': " ".join(winner)
                 })
+
+        text_section = soup.find('div', class_='msg')
+        data['text'] = text_section
+
 
 
     elif "Сообщение о результатах торгов" in title:
+        text_section = soup.find('div', class_='msg')
+        data['text'] = text_section
+
         lot_number = []
         description = []
         winner = []
@@ -119,12 +143,12 @@ def parse_message_page(url, driver):
                 'Номер лота': "&&& ".join(lot_number),
                 'Описание': "&&& ".join(description),
                 'Наименование покупателя': "&&& ".join(winner),
-                'Лучшая цена': "&&& ".join(best_price),
+                'Цена': "&&& ".join(best_price),
                 'Классификация': "&&& ".join(classification),
             })
 
 
-    elif "Объявление о проведении торгов" in title:
+    elif "Объявление о проведении торгов" and "Сообщение об изменении" in title:
         lot_section = soup.find('div', string="Публикуемые сведения")
         if lot_section:
             lot_table = lot_section.find_next("table")
@@ -136,6 +160,9 @@ def parse_message_page(url, driver):
                         field = cells[0].text.strip()
                         value = cells[1].text.strip()
                         data[field] = value
+
+        text_section = soup.find('div', class_='msg')
+        data['text'] = text_section
 
         lot_numbers = []
         lot_descriptions = []
@@ -168,7 +195,7 @@ def parse_message_page(url, driver):
             data.update({
                 'Номер лота': "&&& ".join(lot_numbers),
                 'Описание': "&&& ".join(lot_descriptions),
-                'Начальная цена, руб': "&&& ".join(lot_prices),
+                'Цена': "&&& ".join(lot_prices),
                 'Классификация': "&&& ".join(lot_classification),
             })
 
@@ -215,7 +242,11 @@ def parse_message_page(url, driver):
                     'Тип': "&&& ".join(types),
                     'Описание': "&&& ".join(descriptions),
                     'Дата определения стоимости': "&&& ".join(dates),
-                    'Стоимость, определенная оценщиком': "&&& ".join(estimated_prices),
+                    'Цена': "&&& ".join(estimated_prices),
                     'Балансовая стоимость': "&&& ".join(balance_values)
                 })
+
+        text_section = soup.find('div', class_='msg')
+        data['text'] = text_section
+
     return data
