@@ -55,17 +55,17 @@ def fetch_and_parse_first_page(driver):
                 "дата": date,
                 "тип_сообщения": message_type,
                 "должник": debtor,
+                "должник_ссылка": f"https://old.bankrot.fedresurs.ru{link_debtor}" if link_debtor else "Нет ссылки",
                 "арбитр": published_by,
-                "сообщение_ссылка": f"https://old.bankrot.fedresurs.ru{link_messeges}" if link_messeges else "Нет ссылки",
                 "арбитр_ссылка": f"https://old.bankrot.fedresurs.ru{link_arbitr}" if link_arbitr else "Нет ссылки",
-                "должник_ссылка": f"https://old.bankrot.fedresurs.ru{link_debtor}" if link_debtor else "Нет ссылки"
+                "сообщение_ссылка": f"https://old.bankrot.fedresurs.ru{link_messeges}" if link_messeges else "Нет ссылки",
             }
 
             # Проверяем, является ли сообщение новым
             if msg_id not in checked_messages:
                 checked_messages.append(msg_id)
 
-                print("Найдено релевантное сообщение:")
+                print("\n\nНайдено релевантное сообщение:")
                 print(f"Дата: {date}")
                 print(f"Тип сообщения: {message_type}")
                 print(f"Должник: {debtor}")

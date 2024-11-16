@@ -19,7 +19,7 @@ connection = get_db_connection()
 while True:
     new_messages = fetch_and_parse_first_page(driver)
     if new_messages is None:
-        print("Новых сообщений нет, продолжаем проверку...")
+        print("Новых сообщений нет, продолжаем проверку...\n\n")
         time.sleep(0.5)
         continue
 
@@ -27,10 +27,10 @@ while True:
     try:
         message_content = parse_message_page(link, driver)
         new_messages['message_content'] = message_content
-        print(new_messages)
+
         # Подготовка данных перед вставкой в базу
         prepared_data = prepare_data_for_db(new_messages)
-
+        print(prepared_data)
         # Вставка данных в базу
         new_id = insert_message_to_db(prepared_data, connection)
     except Exception as e:

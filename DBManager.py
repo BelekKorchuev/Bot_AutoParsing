@@ -4,40 +4,41 @@ from datetime import datetime
 # Функция для подключения к базе данных
 def get_db_connection():
     connection = psycopg2.connect(
-        host="localhost",
+        host="176.53.160.95",
         port="5432",
-        database="ourcrm",
-        user="postgres",
-        password="belek12"
+        database="default_db",
+        user="gen_user",
+        password=r"\mk+{TSH3./:V6"
     )
     return connection
 
 # Функция для очистки текста
 def clean_text(text):
     """Удаляет лишние символы из текста и приводит его в читаемый вид"""
-    return text.replace('\xa0', ' ').strip()
+    claer_data = text.replace('\xa0', ' ').strip()
+    data = claer_data.replace('\t', '').strip()
+    return data
 
 # Функция для подготовки данных для вставки в базу данных
 def prepare_data_for_db(raw_data):
     """Приводит данные к нужному формату для вставки в базу данных"""
 
     # Общие данные для всех сообщений
-    date = datetime.strptime(raw_data['дата'], "%d.%m.%Y %H:%M:%S") if 'date' in raw_data else None
+    data = raw_data.get('дата', '')
+    date = datetime.strptime(data, "%d.%m.%Y %H:%M:%S") if data else None
     message_type = clean_text(raw_data.get('тип_сообщения', ''))
     debtor = clean_text(raw_data.get('должник', ''))
     debtor_link = raw_data.get('должник_ссылка', '')
     arbiter = clean_text(raw_data.get('арбитр', ''))
     arbiter_link = raw_data.get('арбитр_ссылка', '')
-    message_link = raw_data.get('должник_ссылка', '')
+    message_link = raw_data.get('сообщение_ссылка', '')
 
     # Данные из содержимого сообщения
     message_content = raw_data.get('message_content', {})
     message_number = clean_text(message_content.get('№ сообщения', ''))
     publication_date = message_content.get('Дата публикации', '')
-    if publication_date:
-        publication_date = datetime.strptime(publication_date, "%d.%m.%Y")
-    else:
-        publication_date = None
+    publication_date = datetime.strptime(publication_date, "%d.%m.%Y") if publication_date else None
+
 
     # Данные о должнике
     debtor_name = clean_text(message_content.get('Наименование должника', '') or message_content.get('ФИО должника', ''))
@@ -74,22 +75,18 @@ def prepare_data_for_db(raw_data):
     text = clean_text(message_content.get('текст', ''))
 
     # Классификация и результаты
-    classification = clean_text(message_content.get('Классификация имущества', ''))
+    classification = clean_text(message_content.get('Классификация', ''))
     dkp = clean_text(message_content.get('Сведения о заключении договора купли-продажи', ''))
     auction_type = clean_text(message_content.get('Вид торгов', ''))
-    application_start_date = message_content.get('Дата и время начала подачи заявок', '')
-    application_start_date = datetime.strptime(application_start_date,
-                                               "%d.%m.%Y %H:%M:%S") if application_start_date else None
-    application_end_date = message_content.get('Дата и время окончания подачи заявок', '')
-    application_end_date = datetime.strptime(application_end_date, "%d.%m.%Y %H:%M:%S") if application_end_date else None
+    application_start_date = clean_text(message_content.get('Дата и время начала подачи заявок', ''))
+    application_end_date = clean_text(message_content.get('Дата и время окончания подачи заявок', ''))
     application_rules = clean_text(message_content.get('Правила подачи заявок', ''))
-    auction_date = message_content.get('Дата и время торгов', '')
+    auction_date = clean_text(message_content.get('Дата и время торгов', ''))
     price_submission_form = clean_text(message_content.get('Форма подачи предложения о цене', ''))
     auction_location = clean_text(message_content.get('Место проведения', ''))
     auction_result = clean_text(message_content.get('Результат', ''))
 
     # Данные по оценке
-    evaluation_type = clean_text(message_content.get('Тип', ''))
     evaluation_date = message_content.get('Дата определения стоимости', '')
     evaluation_date = datetime.strptime(evaluation_date, "%d.%m.%Y") if evaluation_date else None
     balance_value = message_content.get('Балансовая стоимость', None)
@@ -147,7 +144,6 @@ def prepare_data_for_db(raw_data):
         'место_проведения': auction_location,
         'результат': auction_result,
 
-        'тип_оценки': evaluation_type,
         'дата_определения_стоимости': evaluation_date,
         'балансовая_стоимость': balance_value
     }
@@ -171,10 +167,10 @@ def insert_message_to_db(data, connection):
         классификация,
         ДКП, вид_торгов, дата_начала_подачи_заявок, дата_окончания_подачи_заявок, правила_подачи_заявок,
         дата_время_торгов, форма_подачи_предложения_о_цене, место_проведения,
-        тип_оценки, дата_определения_стоимости, балансовая_стоимость
+        дата_определения_стоимости, балансовая_стоимость
     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
               %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-              %s, %s, %s, %s, %s, %s, %s, %s, %s)
+              %s, %s, %s, %s, %s, %s, %s, %s)
     RETURNING id;
     '''
     try:
@@ -222,7 +218,6 @@ def insert_message_to_db(data, connection):
             data.get('дата_время_торгов'),
             data.get('форма_подачи_предложения_о_цене'),
             data.get('место_проведения'),
-            data.get('тип_оценки'),
             data.get('дата_определения_стоимости'),
             data.get('балансовая_стоимость')
         )
@@ -236,5 +231,6 @@ def insert_message_to_db(data, connection):
         print(f"Данные успешно вставлены с ID: {new_id}")
     except Exception as e:
         print("Ошибка при выполнении запроса:", e)
+        connection.rollback()
     finally:
         cursor.close()
