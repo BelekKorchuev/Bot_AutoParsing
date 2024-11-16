@@ -6,6 +6,7 @@ from detecting import fetch_and_parse_first_page
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 from parsing import parse_message_page
+from split import split_columns
 
 # Конфигурация Chrome
 chrome_options = Options()
@@ -25,13 +26,18 @@ while True:
 
     link = new_messages["сообщение_ссылка"]
     try:
+        # парсинг содержимого сообщения
         message_content = parse_message_page(link, driver)
         new_messages['message_content'] = message_content
 
         # Подготовка данных перед вставкой в базу
         prepared_data = prepare_data_for_db(new_messages)
         print(prepared_data)
-        # Вставка данных в базу
+
+        # отправка данных на форматирование и разделение сообщений по лотам
+        Formated_Data = split_columns(prepared_data)
+
+        # вывод id сообщения из базы
         new_id = insert_message_to_db(prepared_data, connection)
     except Exception as e:
         print("Ошибка при парсинге страницы или вставке данных:", e)

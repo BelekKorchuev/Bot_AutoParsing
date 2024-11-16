@@ -85,32 +85,88 @@ def parse_message_page(url, driver):
                         value = cells[1].text.strip()
                         data[field] = value
 
+    if "Сведения о заключении договора" in title:
+        lot_numbers = []
+        descriptions = []
+        agreements = []
+        contract_numbers = []
+        contract_dates = []
+        prices = []
+        winner = []
+
+        lot_platform = soup.find('div', string='Публикуемые сведения')
+        if lot_platform:
+            lot_table = lot_platform.find_next("table")
+            if lot_table:
+                lot_rows = lot_table.find_all('tr')
+                for row in lot_rows:
+                    cells = row.find_all('td')
+                    if len(cells) == 2:
+                        field = cells[0].text.strip()
+                        value = cells[1].text.strip()
+                        data[field] = value
+
         lot_section = soup.find('div', string=lambda x: x and 'Заключенные договоры' in x)
         if lot_section:
             lot_table = lot_section.find_next("table")
             if lot_table:
                 lot_rows = lot_table.find_all('tr')
+
+                current_lot = {
+                    "Номер лота": '',
+                    "Описание": ' ',
+                    "Сведения о заключении договора": '',
+                    "Номер договора": '',
+                    "Дата заключения договора": '',
+                    "Цена приобретения имущества, руб.": '',
+                    "Наименование покупателя": ''
+                }
+
                 for row in lot_rows:
                     cells = row.find_all('td')
                     if len(cells) >= 2:
                         field = cells[0].text.strip()
                         value = cells[1].text.strip()
 
-                        # Сопоставление поля и добавление в соответствующий список
-                        if field == "Номер лота":
-                            lot_numbers.append(value)
-                        elif field == "Описание":
-                            descriptions.append(value)
-                        elif field == "Сведения о заключении договора":
-                            agreements.append(value)
-                        elif field == "Номер договора":
-                            contract_numbers.append(value)
-                        elif field == "Дата заключения договора":
-                            contract_dates.append(value)
-                        elif field == "Цена приобретения имущества, руб.":
-                            prices.append(value)
-                        elif field == "Наименование покупателя":
-                            winner.append(value)
+                        if field in current_lot:
+                            current_lot[field] = value if value else ' '
+
+                    # Проверяем, что строка закончилась, и начинаем новый лот
+                    if "Наименование покупателя" in current_lot and current_lot["Наименование покупателя"]:
+                        # Добавляем данные текущего лота в итоговые списки
+                        lot_numbers.append(current_lot["Номер лота"])
+                        descriptions.append(current_lot["Описание"])
+                        agreements.append(current_lot["Сведения о заключении договора"])
+                        contract_numbers.append(current_lot["Номер договора"])
+                        contract_dates.append(current_lot["Дата заключения договора"])
+                        prices.append(current_lot["Цена приобретения имущества, руб."])
+                        winner.append(current_lot["Наименование покупателя"])
+
+                        # Обнуляем временный словарь для следующего лота
+                        current_lot = {
+                            "Номер лота": '',
+                            "Описание": '',
+                            "Сведения о заключении договора": '',
+                            "Номер договора": '',
+                            "Дата заключения договора": '',
+                            "Цена приобретения имущества, руб.": '',
+                            "Наименование покупателя": ''
+                        }
+
+                # Проверяем, не остались ли данные последнего лота
+                if any(value != '' for value in current_lot.values()):
+                    lot_numbers.append(current_lot["Номер лота"] if current_lot["Номер лота"].strip() else ' ')
+                    descriptions.append(current_lot["Описание"] if current_lot["Описание"].strip() else ' ')
+                    agreements.append(current_lot["Сведения о заключении договора"] if current_lot[
+                        "Сведения о заключении договора"].strip() else ' ')
+                    contract_numbers.append(
+                        current_lot["Номер договора"] if current_lot["Номер договора"].strip() else ' ')
+                    contract_dates.append(current_lot["Дата заключения договора"] if current_lot[
+                        "Дата заключения договора"].strip() else ' ')
+                    prices.append(current_lot["Цена приобретения имущества, руб."] if current_lot[
+                        "Цена приобретения имущества, руб."].strip() else ' ')
+                    winner.append(current_lot["Наименование покупателя"] if current_lot[
+                        "Наименование покупателя"].strip() else ' ')
 
                 data.update({
                     'Номер лота': "&&& ".join(lot_numbers),

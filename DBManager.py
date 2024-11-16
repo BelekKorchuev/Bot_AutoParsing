@@ -15,9 +15,11 @@ def get_db_connection():
 # Функция для очистки текста
 def clean_text(text):
     """Удаляет лишние символы из текста и приводит его в читаемый вид"""
-    claer_data = text.replace('\xa0', ' ').strip()
-    data = claer_data.replace('\t', '').strip()
-    return data
+    text = text.replace('\xa0', ' ').replace('\t', ' ').strip()
+    # Убираем лишние пробелы, если они есть
+    text = " ".join(text.split())
+
+    return text
 
 # Функция для подготовки данных для вставки в базу данных
 def prepare_data_for_db(raw_data):
@@ -38,7 +40,6 @@ def prepare_data_for_db(raw_data):
     message_number = clean_text(message_content.get('№ сообщения', ''))
     publication_date = message_content.get('Дата публикации', '')
     publication_date = datetime.strptime(publication_date, "%d.%m.%Y") if publication_date else None
-
 
     # Данные о должнике
     debtor_name = clean_text(message_content.get('Наименование должника', '') or message_content.get('ФИО должника', ''))
