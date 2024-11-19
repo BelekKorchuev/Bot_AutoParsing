@@ -1,7 +1,10 @@
 import logging
+import os
 import time
 import re
 import json
+
+from dotenv import load_dotenv
 from sqlalchemy import create_engine, Table, Column, String, Integer, MetaData, select, insert, exists
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
@@ -9,9 +12,17 @@ from sqlalchemy.exc import SQLAlchemyError
 # Настройка логирования
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+load_dotenv(dotenv_path='.env')
+
+db_name = os.getenv("DB_NAME")
+db_user = os.getenv("DB_USER")
+db_password = os.getenv("DB_PASSWORD")
+db_host = os.getenv("DB_HOST")
+db_port = os.getenv("DB_PORT")
+
 # Подключение к базе данных PostgreSQL
-DATABASE_URL = r"postgresql+psycopg2://gen_user:\mk+{TSH3./:V6@176.53.160.95:5432/default_db"
-engine = create_engine(DATABASE_URL)
+connection_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+engine = create_engine(connection_url)
 Session = sessionmaker(bind=engine)
 
 # Определение метаданных и таблиц
@@ -189,7 +200,3 @@ def process_messages():
             session.rollback()
         finally:
             time.sleep(3)
-
-# Запуск функции
-if __name__ == "__main__":
-    process_messages()

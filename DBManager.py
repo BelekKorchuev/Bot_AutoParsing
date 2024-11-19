@@ -1,26 +1,25 @@
-import pandas as pd
 import psycopg2
 from datetime import datetime
-from sqlalchemy import create_engine
-
+from dotenv import load_dotenv
 from split import ensure_list
+import os
 
-db_name = "default_db"
-db_user = "gen_user"
-db_password = r"\mk+{TSH3./:V6"
-db_host = "176.53.160.95"
-db_port = "5432"
+load_dotenv(dotenv_path='.env')
 
-connection_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+db_name = os.getenv("DB_NAME")
+db_user = os.getenv("DB_USER")
+db_password = os.getenv("DB_PASSWORD")
+db_host = os.getenv("DB_HOST")
+db_port = os.getenv("DB_PORT")
 
 # Функция для подключения к базе данных
 def get_db_connection():
     connection = psycopg2.connect(
-        host="176.53.160.95",
-        port="5432",
-        database="default_db",
-        user="gen_user",
-        password=r"\mk+{TSH3./:V6"
+        host=db_host,
+        port=db_port,
+        database=db_name,
+        user=db_user,
+        password=db_password
     )
     return connection
 
