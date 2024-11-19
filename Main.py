@@ -7,8 +7,11 @@ from DBManager import prepare_data_for_db, get_db_connection, insert_message_to_
 from detecting import fetch_and_parse_first_page
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
+
+from lotsDetecting import check_debtor
 from parsing import parse_message_page
 from split import split_columns
+
 
 # Конфигурация Chrome
 chrome_options = Options()
@@ -43,14 +46,19 @@ while True:
             # отправка данных на форматирование и разделение сообщений по лотам
             formatted_data = split_columns(prepared_data)
 
-            # if not isinstance(formatted_data, pd.DataFrame):
-            #     print(f"Ошибка в split_columns: возвращённый тип данных {type(formatted_data)}")
-            #     formatted_data = pd.DataFrame(formatted_data)  # Преобразовать в DataFrame
-
             # отправка данных о лоте в БД
             insert_lots_to_db(formatted_data, connection)
+
+            try:
+                # проверка отформатированных данных на наличие должника
+                check_debtor(formatted_data)
+            except Exception as e:
+                print(f"Ошибка при проверке АУ и должника: {e}")
+                continue
+
         except Exception as e:
             print("Ошибка при форматировании и отправке данных в базу:", e)
+
     except Exception as e:
         print("Ошибка при парсинге страницы или вставке данных:", e)
 
