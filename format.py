@@ -3,14 +3,6 @@ import re
 import logging
 from tabulate import tabulate
 
-# Настройка логирования
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[logging.StreamHandler()]
-)
-
-
 def filter_results_before_transfer(data):
     """
     Фильтрует строки на основе условий:
@@ -245,6 +237,12 @@ def process_data(data):
         row['вид_торгов'] = rename_type_message(row.get('вид_торгов', ""))
         row['Цена'] = price_text(row.get('Цена', ""))
         row['Дата_публикации'] = convert_to_date_only([row.get('Дата_публикации')])[0]
+        row['Дата_публикации_предыдущего_сообщ'] = extract_date(row.get('Предыдущий_номер_сообщения_по_лот', ""))
+        row['Предыдущий_номер_сообщения_по_лот'] = extract_number(row.get('Предыдущий_номер_сообщения_по_лот', ""))
+        row['Дата_публикации_сообщения_ДКП'] = extract_date(row.get('Статус_ДКП', ""))
+        row['Статус_ДКП'] = extract_number(row.get('Статус_ДКП', ""))
+        row['Дата_публикации_сообщения_о_резул'] = extract_date(row.get('Статус_сообщения_о_результатах_то', ""))
+        row['Статус_сообщения_о_результатах_то'] = extract_number(row.get('Статус_сообщения_о_результатах_то', ""))
         processed_data.append(row)
 
     logging.info(f"Обработка завершена. Отфильтровано лотов: {len(processed_data)}")
