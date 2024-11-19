@@ -1,8 +1,11 @@
+import pandas as pd
 from bs4 import BeautifulSoup
+from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 import time
 from selenium.webdriver.support import expected_conditions as EC
+
 
 # Функция для получения и парсинга HTML-кода по предоставленной ссылке
 def parse_message_page(url, driver):
@@ -23,7 +26,6 @@ def parse_message_page(url, driver):
 
     # Извлечение заголовка сообщения
     title = soup.find('h1', class_='red_small').text.strip()
-    data['title'] = title
 
     # Основная информация
     table_main = soup.find('table', class_='headInfo')
@@ -69,21 +71,102 @@ def parse_message_page(url, driver):
         contract_numbers = []
         contract_dates = []
         prices = []
+        winner = []
 
-        lot_section = soup.find('div', string="Публикуемые сведения")
-        if lot_section:
-            lot_table = lot_section.find_next("table")
+        lot_platform = soup.find('div', string='Публикуемые сведения')
+        if lot_platform:
+            lot_table = lot_platform.find_next("table")
             if lot_table:
                 lot_rows = lot_table.find_all('tr')
                 for row in lot_rows:
                     cells = row.find_all('td')
-                    if len(cells) >= 7:
-                        lot_numbers.append(f'{cells[1].text.strip()}')
-                        descriptions.append(f'{cells[2].text.strip()}')
-                        agreements.append(f'{cells[3].text.strip()}')
-                        contract_numbers.append(f'{cells[4].text.strip()}')
-                        contract_dates.append(f'{cells[5].text.strip()}')
-                        prices.append(f'{cells[6].text.strip()}')
+                    if len(cells) == 2:
+                        field = cells[0].text.strip()
+                        value = cells[1].text.strip()
+                        data[field] = value
+
+    if "Сведения о заключении договора" in title:
+        lot_numbers = []
+        descriptions = []
+        agreements = []
+        contract_numbers = []
+        contract_dates = []
+        prices = []
+        winner = []
+
+        lot_platform = soup.find('div', string='Публикуемые сведения')
+        if lot_platform:
+            lot_table = lot_platform.find_next("table")
+            if lot_table:
+                lot_rows = lot_table.find_all('tr')
+                for row in lot_rows:
+                    cells = row.find_all('td')
+                    if len(cells) == 2:
+                        field = cells[0].text.strip()
+                        value = cells[1].text.strip()
+                        data[field] = value
+
+        lot_section = soup.find('div', string=lambda x: x and 'Заключенные договоры' in x)
+        if lot_section:
+            lot_table = lot_section.find_next("table")
+            if lot_table:
+                lot_rows = lot_table.find_all('tr')
+
+                current_lot = {
+                    "Номер лота": '',
+                    "Описание": ' ',
+                    "Сведения о заключении договора": '',
+                    "Номер договора": '',
+                    "Дата заключения договора": '',
+                    "Цена приобретения имущества, руб.": '',
+                    "Наименование покупателя": ''
+                }
+
+                for row in lot_rows:
+                    cells = row.find_all('td')
+                    if len(cells) >= 2:
+                        field = cells[0].text.strip()
+                        value = cells[1].text.strip()
+
+                        if field in current_lot:
+                            current_lot[field] = value if value else ' '
+
+                    # Проверяем, что строка закончилась, и начинаем новый лот
+                    if "Наименование покупателя" in current_lot and current_lot["Наименование покупателя"]:
+                        # Добавляем данные текущего лота в итоговые списки
+                        lot_numbers.append(current_lot["Номер лота"])
+                        descriptions.append(current_lot["Описание"])
+                        agreements.append(current_lot["Сведения о заключении договора"])
+                        contract_numbers.append(current_lot["Номер договора"])
+                        contract_dates.append(current_lot["Дата заключения договора"])
+                        prices.append(current_lot["Цена приобретения имущества, руб."])
+                        winner.append(current_lot["Наименование покупателя"])
+
+                        # Обнуляем временный словарь для следующего лота
+                        current_lot = {
+                            "Номер лота": '',
+                            "Описание": '',
+                            "Сведения о заключении договора": '',
+                            "Номер договора": '',
+                            "Дата заключения договора": '',
+                            "Цена приобретения имущества, руб.": '',
+                            "Наименование покупателя": ''
+                        }
+
+                # Проверяем, не остались ли данные последнего лота
+                if any(value != '' for value in current_lot.values()):
+                    lot_numbers.append(current_lot["Номер лота"] if current_lot["Номер лота"].strip() else ' ')
+                    descriptions.append(current_lot["Описание"] if current_lot["Описание"].strip() else ' ')
+                    agreements.append(current_lot["Сведения о заключении договора"] if current_lot[
+                        "Сведения о заключении договора"].strip() else ' ')
+                    contract_numbers.append(
+                        current_lot["Номер договора"] if current_lot["Номер договора"].strip() else ' ')
+                    contract_dates.append(current_lot["Дата заключения договора"] if current_lot[
+                        "Дата заключения договора"].strip() else ' ')
+                    prices.append(current_lot["Цена приобретения имущества, руб."] if current_lot[
+                        "Цена приобретения имущества, руб."].strip() else ' ')
+                    winner.append(current_lot["Наименование покупателя"] if current_lot[
+                        "Наименование покупателя"].strip() else ' ')
 
                 data.update({
                     'Номер лота': "&&& ".join(lot_numbers),
@@ -91,11 +174,21 @@ def parse_message_page(url, driver):
                     'Сведения о заключении договора': "&&& ".join(agreements),
                     'Номер договора': "&&& ".join(contract_numbers),
                     'Дата заключения договора': "&&& ".join(contract_dates),
-                    'Цена приобретения имущества, руб.': "&&& ".join(prices),
+                    'Цена': "&&& ".join(prices),
+                    'Наименование покупателя': " ".join(winner)
                 })
+            else:
+                print("Таблица не найдена.")
+        else:
+            print("Секция 'msg' не найдена.")
 
+        pre_text = soup.find_all('div', class_='msg')[-1]
+        data['текст'] = pre_text.text.strip() if pre_text else ""
 
     elif "Сообщение о результатах торгов" in title:
+        text_section = soup.find('div', class_='msg')
+        data['текст'] = text_section.text.strip() if text_section else ""
+
         lot_number = []
         description = []
         winner = []
@@ -119,12 +212,12 @@ def parse_message_page(url, driver):
                 'Номер лота': "&&& ".join(lot_number),
                 'Описание': "&&& ".join(description),
                 'Наименование покупателя': "&&& ".join(winner),
-                'Лучшая цена': "&&& ".join(best_price),
+                'Цена': "&&& ".join(best_price),
                 'Классификация': "&&& ".join(classification),
             })
 
 
-    elif "Объявление о проведении торгов" in title:
+    elif "Объявление о проведении торгов" in title or "Сообщение об изменении" in title:
         lot_section = soup.find('div', string="Публикуемые сведения")
         if lot_section:
             lot_table = lot_section.find_next("table")
@@ -136,6 +229,9 @@ def parse_message_page(url, driver):
                         field = cells[0].text.strip()
                         value = cells[1].text.strip()
                         data[field] = value
+
+        text_section = soup.find('div', class_='msg')
+        data['текст'] = text_section.text.strip() if text_section else ""
 
         lot_numbers = []
         lot_descriptions = []
@@ -168,7 +264,7 @@ def parse_message_page(url, driver):
             data.update({
                 'Номер лота': "&&& ".join(lot_numbers),
                 'Описание': "&&& ".join(lot_descriptions),
-                'Начальная цена, руб': "&&& ".join(lot_prices),
+                'Цена': "&&& ".join(lot_prices),
                 'Классификация': "&&& ".join(lot_classification),
             })
 
@@ -190,12 +286,13 @@ def parse_message_page(url, driver):
                 'Сообщение о результатах торгов': "&&& ".join(auction_results),
             })
 
-    elif "Отчет оценщика об оценке имущества должника" in title:
+    elif "Отчет оценщика об оценке" in title:
         types = []
         descriptions = []
         dates = []
         estimated_prices = []
         balance_values = []
+
 
         lot_section = soup.find('div', string="Сведения об объектах оценки")
         if lot_section:
@@ -212,10 +309,26 @@ def parse_message_page(url, driver):
                         balance_values.append(cells[4].text.strip()) # Классификация имущества
 
                 data.update({
-                    'Тип': "&&& ".join(types),
+                    'Классификация': "&&& ".join(types),
                     'Описание': "&&& ".join(descriptions),
                     'Дата определения стоимости': "&&& ".join(dates),
-                    'Стоимость, определенная оценщиком': "&&& ".join(estimated_prices),
+                    'Цена': "&&& ".join(estimated_prices),
                     'Балансовая стоимость': "&&& ".join(balance_values)
                 })
+
+        text_section = soup.find('div', class_='msg')
+        data['текст'] = text_section.text.strip() if text_section else ""
+
     return data
+
+# excel_file_path = 'dkp.xlsx'  # Укажите ваш путь к файлу
+# links = pd.read_excel(excel_file_path)['Link'].dropna().tolist()
+# driver = webdriver.Chrome()
+#
+# for url in links:
+#     print(f"Парсинг ссылки: {url}")
+#     data = parse_message_page(url, driver)
+#     print(data)  # Вывод данных, полученных с каждой страницы
+#
+# # Закрытие драйвера после завершения
+# driver.quit()
