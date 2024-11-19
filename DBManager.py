@@ -1,5 +1,17 @@
+import pandas as pd
 import psycopg2
 from datetime import datetime
+from sqlalchemy import create_engine
+
+from split import ensure_list
+
+db_name = "default_db"
+db_user = "gen_user"
+db_password = r"\mk+{TSH3./:V6"
+db_host = "176.53.160.95"
+db_port = "5432"
+
+connection_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
 
 # Функция для подключения к базе данных
 def get_db_connection():
@@ -233,5 +245,75 @@ def insert_message_to_db(data, connection):
     except Exception as e:
         print("Ошибка при выполнении запроса:", e)
         connection.rollback()
+    finally:
+        cursor.close()
+
+def insert_lots_to_db(data, connection):
+    """
+    Вставляет список данных (список словарей) в таблицу `lots` и возвращает список ИНН.
+    """
+    data_list = ensure_list(data)
+
+    cursor = connection.cursor()
+    insert_query = '''
+    INSERT INTO lots (
+        ИНН_Должника, Дата_публикации, Дата_начала_торгов, Дата_окончания,
+        Номер_дела, Действующий_номер_сообщения, Номер_лота,
+        Ссылка_на_сообщение_ЕФРСБ, Имущество, Классификация_имущества, Цена,
+        Предыдущий_номер_сообщения_по_лот, Дата_публикации_предыдущего_сообщ,
+        Организатор_торгов, Торговая_площадка, Статус_ДКП, Статус_сообщения_о_результатах_то,
+        ЕФРСБ_ББ, Должник_текст, вид_торгов, Дата_публикации_сообщения_ДКП,
+        Дата_публикации_сообщения_о_резул
+    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    RETURNING ИНН_Должника;
+    '''
+    try:
+        returned_inns = []  # Список для хранения возвращаемых ИНН
+        for data in data_list:
+
+            # Отладочный вывод ключей и значений
+            print("Данные для вставки:", data)
+            for key, value in data.items():
+                print(f"{key}: {value}")
+
+            params = (
+                data.get('ИНН_Должника'),
+                data.get('Дата_публикации'),
+                data.get('Дата_начала_торгов'),
+                data.get('Дата_окончания'),
+                data.get('Номер_дела'),
+                data.get('Действующий_номер_сообщения'),
+                data.get('Номер_лота'),
+                data.get('Ссылка_на_сообщение_ЕФРСБ'),
+                data.get('Имущество'),
+                data.get('Классификация_имущества'),
+                data.get('Цена'),
+                data.get('Предыдущий_номер_сообщения_по_лот'),
+                data.get('Дата_публикации_предыдущего_сообщ'),
+                data.get('Организатор_торгов'),
+                data.get('Торговая_площадка'),
+                data.get('Статус_ДКП'),
+                data.get('Статус_сообщения_о_результатах_то'),
+                data.get('ЕФРСБ_ББ'),
+                data.get('Должник_текст'),
+                data.get('вид_торгов'),
+                data.get('Дата_публикации_сообщения_ДКП'),
+                data.get('Дата_публикации_сообщения_о_резул')
+            )
+
+            # Печать параметров для отладки
+            print("Параметры запроса:", params)
+
+            cursor.execute(insert_query, params)
+            inn = cursor.fetchone()[0]  # Извлекаем ИНН_Должника
+            returned_inns.append(inn)
+            print(f"Данные успешно вставлены с ИНН: {inn}")
+
+        connection.commit()
+        return returned_inns  # Возвращаем список ИНН
+    except Exception as e:
+        print("Ошибка при выполнении запроса:", e)
+        connection.rollback()
+        return None
     finally:
         cursor.close()

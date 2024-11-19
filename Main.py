@@ -1,7 +1,9 @@
 import time
+
+import pandas as pd
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from DBManager import prepare_data_for_db, get_db_connection, insert_message_to_db
+from DBManager import prepare_data_for_db, get_db_connection, insert_message_to_db, insert_lots_to_db
 from detecting import fetch_and_parse_first_page
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
@@ -34,11 +36,21 @@ while True:
         prepared_data = prepare_data_for_db(new_messages)
         print(prepared_data)
 
-        # отправка данных на форматирование и разделение сообщений по лотам
-        Formated_Data = split_columns(prepared_data)
-
-        # вывод id сообщения из базы
+        # отправка сырых собщений в БД и возврат их id
         new_id = insert_message_to_db(prepared_data, connection)
+
+        try:
+            # отправка данных на форматирование и разделение сообщений по лотам
+            formatted_data = split_columns(prepared_data)
+
+            # if not isinstance(formatted_data, pd.DataFrame):
+            #     print(f"Ошибка в split_columns: возвращённый тип данных {type(formatted_data)}")
+            #     formatted_data = pd.DataFrame(formatted_data)  # Преобразовать в DataFrame
+
+            # отправка данных о лоте в БД
+            insert_lots_to_db(formatted_data, connection)
+        except Exception as e:
+            print("Ошибка при форматировании и отправке данных в базу:", e)
     except Exception as e:
         print("Ошибка при парсинге страницы или вставке данных:", e)
 
