@@ -125,8 +125,6 @@ def delete_org(text):
     return text
 
 
-
-
 def extract_number(text):
     logging.debug(f"Извлечение номера из текста: {text}")
     match = re.search(r'№(\d+)', text)

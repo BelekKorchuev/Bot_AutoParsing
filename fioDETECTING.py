@@ -1,17 +1,16 @@
+import asyncio
+import re
 import logging
 import os
-import time
-import re
 import json
 
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, Table, Column, String, Integer, MetaData, select, insert, exists
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import MetaData, select, insert
 
-# Настройка логирования
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+# Загрузка переменных окружения
 load_dotenv(dotenv_path='.env')
 
 db_name = os.getenv("DB_NAME")
@@ -20,40 +19,29 @@ db_password = os.getenv("DB_PASSWORD")
 db_host = os.getenv("DB_HOST")
 db_port = os.getenv("DB_PORT")
 
-# Подключение к базе данных PostgreSQL
-connection_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
-engine = create_engine(connection_url)
-Session = sessionmaker(bind=engine)
+# Формируем строку подключения для SQLAlchemy с использованием asyncpg
+db_url = f"postgresql+asyncpg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
 
-# Определение метаданных и таблиц
-metadata = MetaData()
+# Создаем асинхронный движок SQLAlchemy
+engine = create_async_engine(db_url, echo=False, future=True)
 
-# Таблица 'arbitr_managers'
-arbitr_managers = Table(
-    'arbitr_managers', metadata,
-    Column('ИНН_АУ', String),
-    Column('ФИО_АУ', String),
-    Column('ссылка_ЕФРСБ', String),
-    Column('город_АУ', String),
-    Column('СРО_АУ', String),
-    Column('почта_ау', String),
-)
+# Создаем асинхронную сессию
+AsyncSessionLocal = sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
 
-# Таблица 'messages'
-messages = Table(
-    'messages', metadata,
-    Column('id', Integer),
-    Column('ФИО_АУ', String),
-    Column('арбитр_ссылка', String),
-    Column('адрес_корреспонденции', String),
-    Column('СРО_АУ', String),
-    Column('почта', String),
-)
+# Настройка логирования
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Путь к файлу для хранения последних 5 ID
+# Файл для хранения последних 5 обработанных ID
 LAST_PROCESSED_FILE = "last_processed_ids.json"
 
-# Функция для чтения последних 5 обработанных ID
+def clean_sro(sro_text):
+    """
+    Удаляет части вида (ИНН XXXXXXXX, ОГРН XXXXXXXXXX) из строки СРО_АУ.
+    """
+    return re.sub(r'\s*\(ИНН[:\s]*\d+,?\s*ОГРН[:\s]*\d+\)', '', str(sro_text)).strip()
+
+
+# Функции для работы с последними обработанными ID
 def read_last_processed_ids():
     try:
         with open(LAST_PROCESSED_FILE, "r") as file:
@@ -61,7 +49,7 @@ def read_last_processed_ids():
     except (FileNotFoundError, json.JSONDecodeError):
         return []
 
-# Функция для сохранения последних 5 обработанных ID
+
 def save_last_processed_ids(new_id):
     last_ids = read_last_processed_ids()
     last_ids.append(new_id)
@@ -70,133 +58,149 @@ def save_last_processed_ids(new_id):
         json.dump(last_ids, file)
     return last_ids
 
-# Функция для получения максимального ID из сохраненных
+
 def get_last_processed_id():
     last_ids = read_last_processed_ids()
     return max(last_ids) if last_ids else 0
 
-# Функция для извлечения ИНН из строки ФИО_АУ
+
+# Функции для обработки данных
 def extract_inn(text):
-    text = str(text)
-    match = re.search(r'ИНН\s*(\d+)', text)
+    match = re.search(r'ИНН[:\s]*(\d+)', str(text))
     return match.group(1) if match else None
 
-# Функция для очистки ФИО_АУ от лишних данных
+
 def clean_fio(text):
-    """
-    Удаляет ИНН и СНИЛС из строки ФИО_АУ, оставляя только ФИО.
-    """
-    text = str(text)
-    # Убираем части вида "(ИНН 123456789012, СНИЛС 123-456-789 00)"
-    return re.sub(r'\s*\(ИНН\s*\d+,\s*СНИЛС\s*\d{3}-\d{3}-\d{3}\s*\d{2}\)', '', text).strip()
+    return re.sub(r'\s*\(ИНН[:\s]*\d+.*?СНИЛС.*?\)', '', str(text)).strip()
 
-# Основная функция для обработки новых данных
-def process_messages():
-    session = Session()
-    last_processed_id = get_last_processed_id()
 
-    while True:
-        try:
-            # Проверяем новые данные
-            log_message = "Проверяем новые данные в таблице 'messages'."
-            logging.info(log_message)
-            print(log_message)
+# Основная функция
+async def fetch_data():
+    async with AsyncSessionLocal() as session:
+        metadata = MetaData()
+        async with engine.begin() as connection:
+            await connection.run_sync(metadata.reflect)
 
-            # Извлекаем записи с ID больше последнего обработанного
-            records = session.execute(select(
-                messages.c.id,
-                messages.c.ФИО_АУ,
-                messages.c.арбитр_ссылка,
-                messages.c.адрес_корреспонденции,
-                messages.c.СРО_АУ,
-                messages.c.почта
-            ).where(messages.c.id > last_processed_id).order_by(messages.c.id)).fetchall()
+        messages_table = metadata.tables.get('messages')
+        arbitr_managers_table = metadata.tables.get('arbitr_managers')
+        dolzhnik_table = metadata.tables.get('dolzhnik')
 
-            if not records:
-                log_message = "Новых записей не найдено. Ожидание..."
-                logging.info(log_message)
-                print(log_message)
-                time.sleep(3)
-                continue
+        # Проверяем, что таблицы были найдены корректно
+        if messages_table is None or arbitr_managers_table is None or dolzhnik_table is None:
+            logging.error("Одна или несколько таблиц не найдены.")
+            return
 
-            for record in records:
-                last_processed_id = record.id  # Обновляем последний обработанный ID
-                save_last_processed_ids(last_processed_id)  # Сохраняем ID в файл
+        while True:
+            try:
+                last_processed_id = get_last_processed_id()
+                logging.info(f"Последний обработанный ID: {last_processed_id if last_processed_id else 'Не найден'}")
 
-                # Логируем обработанный ID
-                log_message = f"Обрабатывается запись с ID: {last_processed_id}"
-                logging.info(log_message)
-                print(log_message)
+                messages_query = select(
+                    messages_table.c['id'],
+                    messages_table.c['ФИО_АУ'],
+                    messages_table.c['арбитр_ссылка'],
+                    messages_table.c['адрес_корреспонденции'],
+                    messages_table.c['СРО_АУ'],
+                    messages_table.c['почта'],
+                    messages_table.c['ИНН'],
+                    messages_table.c['наименование_должника'],
+                    messages_table.c['должник_ссылка'],
+                    messages_table.c['номер_дела']
+                ).where(messages_table.c['id'] > last_processed_id).order_by(messages_table.c['id'])
 
-                # Проверяем, подходит ли ссылка
-                арбитр_ссылка = record.арбитр_ссылка
-                if not арбитр_ссылка.startswith("https://old.bankrot.fedresurs.ru/ArbitrManagerCard.aspx?"):
-                    log_message = f"Ссылка {арбитр_ссылка} не соответствует шаблону. Запись игнорируется."
-                    logging.info(log_message)
-                    print(log_message)
+                messages_result_proxy = await session.execute(messages_query)
+                messages_rows = messages_result_proxy.mappings().all()
+
+                if not messages_rows:
+                    logging.info("Новых строк для обработки нет. Ожидание...")
+                    await asyncio.sleep(3)
                     continue
 
-                # Обработка данных
-                try:
-                    raw_fio = record.ФИО_АУ
-                    адрес_корреспонденции = record.адрес_корреспонденции
-                    СРО_АУ = record.СРО_АУ
-                    почта = record.почта
+                for message_row in messages_rows:
+                    message_id = message_row['id']
+                    raw_fio = message_row['ФИО_АУ']
+                    arbiter_link = message_row['арбитр_ссылка']
+                    address = message_row['адрес_корреспонденции']
+                    sro = clean_sro(message_row['СРО_АУ'])
+                    email = message_row['почта']
+                    message_inn = message_row['ИНН']
+                    debtor_name = message_row['наименование_должника']
+                    debtor_link = message_row['должник_ссылка']
+                    case_number = message_row['номер_дела']
 
-                    # Извлечение ИНН из ФИО_АУ
-                    ИНН_АУ = extract_inn(raw_fio)
-                    cleaned_fio = clean_fio(raw_fio)  # Очищаем ФИО
-
-                    if not ИНН_АУ:
-                        log_message = f"ИНН не удалось извлечь из строки ФИО_АУ: {raw_fio}. Запись игнорируется."
-                        logging.info(log_message)
-                        print(log_message)
+                    # Записываем ID даже если ссылка содержит OrgToCard или PrsToCard
+                    if "OrgToCard" in arbiter_link or "PrsToCard" in arbiter_link:
+                        logging.info(
+                            f"Ссылка {arbiter_link} содержит OrgToCard или PrsToCard. Записываем ID и пропускаем запись.")
+                        save_last_processed_ids(message_id)
+                        last_processed_id = message_id
                         continue
 
-                    # Проверка наличия ИНН в arbitr_managers
-                    inn_exists = session.query(exists().where(arbitr_managers.c.ИНН_АУ == ИНН_АУ)).scalar()
-
-                    if inn_exists:
-                        # Если ИНН уже существует, игнорируем запись
-                        log_message = f"ИНН {ИНН_АУ} уже существует в таблице 'arbitr_managers'. Запись игнорируется."
-                        logging.info(log_message)
-                        print(log_message)
+                    inn_au = extract_inn(raw_fio)
+                    if not inn_au:
+                        logging.info(f"ИНН не удалось извлечь из строки ФИО_АУ: {raw_fio}. Запись игнорируется.")
                         continue
+
+                    arbitr_manager_query = select(arbitr_managers_table.c['ИНН_АУ']).where(
+                        arbitr_managers_table.c['ИНН_АУ'] == inn_au
+                    )
+                    existing_record = await session.execute(arbitr_manager_query)
+                    record_exists = existing_record.fetchone()
+
+                    if record_exists:
+                        logging.info(
+                            f"ИНН {inn_au} уже существует. Запись игнорируется в таблице 'arbitr_managers'. ФИО_АУ: {raw_fio}")
                     else:
-                        # Логи для добавления новой записи
-                        log_message = f"Добавляем новую запись с ИНН: {ИНН_АУ}"
-                        logging.info(log_message)
-                        print(log_message)
-
-                        # Добавляем новую запись
-                        session.execute(
-                            insert(arbitr_managers).values(
-                                ИНН_АУ=ИНН_АУ,
-                                ФИО_АУ=cleaned_fio,
-                                ссылка_ЕФРСБ=арбитр_ссылка,
-                                город_АУ=адрес_корреспонденции,
-                                СРО_АУ=СРО_АУ,
-                                почта_ау=почта
-                            )
+                        insert_stmt = insert(arbitr_managers_table).values(
+                            ИНН_АУ=inn_au,
+                            ФИО_АУ=clean_fio(raw_fio),
+                            ссылка_ЕФРСБ=arbiter_link,
+                            город_АУ=address,
+                            СРО_АУ=sro,
+                            почта_ау=email
                         )
-                        log_message = f"Новая запись с ИНН {ИНН_АУ} успешно добавлена."
-                        logging.info(log_message)
-                        print(log_message)
+                        await session.execute(insert_stmt)
+                        logging.info(f"Добавлена запись в 'arbitr_managers' с ИНН {inn_au}. ФИО_АУ: {raw_fio}")
 
-                except SQLAlchemyError as db_error:
-                    log_message = f"Ошибка базы данных при обработке записи с ID: {record.id}, ошибка: {db_error}"
-                    logging.error(log_message)
-                    print(log_message)
+                    # Теперь проверяем наличие записи в таблице dolzhnik
+                    debtor_query = select(dolzhnik_table.c['Инн_Должника']).where(
+                        dolzhnik_table.c['Инн_Должника'] == message_inn
+                    )
+                    existing_debtor = await session.execute(debtor_query)
+                    debtor_exists = existing_debtor.fetchone()
 
-            session.commit()
-            log_message = "Данные успешно обработаны и сохранены."
-            logging.info(log_message)
-            print(log_message)
+                    if debtor_exists:
+                        logging.info(
+                            f"ИНН должника {message_inn} уже существует в таблице 'dolzhnik'. Запись игнорируется. Наименование должника: {debtor_name}")
+                    else:
+                        insert_debtor_stmt = insert(dolzhnik_table).values(
+                            Инн_Должника=message_inn,
+                            Должник_текст=debtor_name,
+                            Должник_ссылка_ЕФРСБ=debtor_link,
+                            Должник_ссылка_ББ='',
+                            Номер_дела=case_number,
+                            Фл_Юл=('ЮЛ' if len(message_inn) == 10 else 'ФЛ' if len(message_inn) == 12 else ''),
+                            ЕФРСБ_ББ='ЕФРСБ',
+                            АУ_текст=clean_fio(raw_fio),
+                            ИНН_АУ=inn_au
+                        )
+                        await session.execute(insert_debtor_stmt)
+                        logging.info(
+                            f"Добавлена запись в 'dolzhnik' с ИНН должника {message_inn}. Наименование должника: {debtor_name}")
 
-        except Exception as e:
-            log_message = f"Ошибка при обработке сообщений: {e}"
-            logging.error(log_message)
-            print(log_message)
-            session.rollback()
-        finally:
-            time.sleep(3)
+                    # Обновляем последний обработанный ID и сохраняем его в файл
+                    last_processed_id = message_id
+                    save_last_processed_ids(last_processed_id)
+
+                await session.commit()
+                logging.info("Все изменения зафиксированы.")
+
+            except Exception as e:
+                logging.error(f"Ошибка при обработке: {e}")
+                await session.rollback()
+
+            await asyncio.sleep(3)
+
+
+if __name__ == "__main__":
+    asyncio.run(fetch_data())
