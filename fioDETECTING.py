@@ -1,14 +1,12 @@
 import asyncio
 import re
-import logging
+from Main import logger
 import os
 import json
-
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import MetaData, select, insert
-
 
 # Загрузка переменных окружения
 load_dotenv(dotenv_path='.env')
@@ -29,7 +27,7 @@ engine = create_async_engine(db_url, echo=False, future=True)
 AsyncSessionLocal = sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
 
 # Настройка логирования
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger.basicConfig(level=logger.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Файл для хранения последних 5 обработанных ID
 LAST_PROCESSED_FILE = "last_processed_ids.json"
@@ -87,13 +85,13 @@ async def fetch_data():
 
         # Проверяем, что таблицы были найдены корректно
         if messages_table is None or arbitr_managers_table is None or dolzhnik_table is None:
-            logging.error("Одна или несколько таблиц не найдены.")
+            logger.error("Одна или несколько таблиц не найдены.")
             return
 
         while True:
             try:
                 last_processed_id = get_last_processed_id()
-                logging.info(f"Последний обработанный ID: {last_processed_id if last_processed_id else 'Не найден'}")
+                logger.info(f"Последний обработанный ID: {last_processed_id if last_processed_id else 'Не найден'}")
 
                 messages_query = select(
                     messages_table.c['id'],
@@ -112,7 +110,7 @@ async def fetch_data():
                 messages_rows = messages_result_proxy.mappings().all()
 
                 if not messages_rows:
-                    logging.info("Новых строк для обработки нет. Ожидание...")
+                    logger.info("Новых строк для обработки нет. Ожидание...")
                     await asyncio.sleep(3)
                     continue
 
@@ -130,7 +128,7 @@ async def fetch_data():
 
                     # Записываем ID даже если ссылка содержит OrgToCard или PrsToCard
                     if "OrgToCard" in arbiter_link or "PrsToCard" in arbiter_link:
-                        logging.info(
+                        logger.info(
                             f"Ссылка {arbiter_link} содержит OrgToCard или PrsToCard. Записываем ID и пропускаем запись.")
                         save_last_processed_ids(message_id)
                         last_processed_id = message_id
@@ -138,7 +136,7 @@ async def fetch_data():
 
                     inn_au = extract_inn(raw_fio)
                     if not inn_au:
-                        logging.info(f"ИНН не удалось извлечь из строки ФИО_АУ: {raw_fio}. Запись игнорируется.")
+                        logger.info(f"ИНН не удалось извлечь из строки ФИО_АУ: {raw_fio}. Запись игнорируется.")
                         continue
 
                     arbitr_manager_query = select(arbitr_managers_table.c['ИНН_АУ']).where(
@@ -148,7 +146,7 @@ async def fetch_data():
                     record_exists = existing_record.fetchone()
 
                     if record_exists:
-                        logging.info(
+                        logger.info(
                             f"ИНН {inn_au} уже существует. Запись игнорируется в таблице 'arbitr_managers'. ФИО_АУ: {raw_fio}")
                     else:
                         insert_stmt = insert(arbitr_managers_table).values(
@@ -160,7 +158,7 @@ async def fetch_data():
                             почта_ау=email
                         )
                         await session.execute(insert_stmt)
-                        logging.info(f"Добавлена запись в 'arbitr_managers' с ИНН {inn_au}. ФИО_АУ: {raw_fio}")
+                        logger.info(f"Добавлена запись в 'arbitr_managers' с ИНН {inn_au}. ФИО_АУ: {raw_fio}")
 
                     # Теперь проверяем наличие записи в таблице dolzhnik
                     debtor_query = select(dolzhnik_table.c['Инн_Должника']).where(
@@ -170,7 +168,7 @@ async def fetch_data():
                     debtor_exists = existing_debtor.fetchone()
 
                     if debtor_exists:
-                        logging.info(
+                        logger.info(
                             f"ИНН должника {message_inn} уже существует в таблице 'dolzhnik'. Запись игнорируется. Наименование должника: {debtor_name}")
                     else:
                         insert_debtor_stmt = insert(dolzhnik_table).values(
@@ -185,7 +183,7 @@ async def fetch_data():
                             ИНН_АУ=inn_au
                         )
                         await session.execute(insert_debtor_stmt)
-                        logging.info(
+                        logger.info(
                             f"Добавлена запись в 'dolzhnik' с ИНН должника {message_inn}. Наименование должника: {debtor_name}")
 
                     # Обновляем последний обработанный ID и сохраняем его в файл
@@ -193,10 +191,10 @@ async def fetch_data():
                     save_last_processed_ids(last_processed_id)
 
                 await session.commit()
-                logging.info("Все изменения зафиксированы.")
+                logger.info("Все изменения зафиксированы.")
 
             except Exception as e:
-                logging.error(f"Ошибка при обработке: {e}")
+                logger.error(f"Ошибка при обработке: {e}")
                 await session.rollback()
 
             await asyncio.sleep(3)

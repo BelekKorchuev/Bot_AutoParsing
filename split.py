@@ -1,6 +1,4 @@
-import datetime
 from format import get_massageLots
-import pprint
 
 def ensure_list(data):
     """
@@ -51,12 +49,9 @@ def split_columns(SplitDB):
                     new_row[col] = row[col]
             split_data.append(new_row)
 
-    # Пример вывода результата
-    for row in split_data:
-        print(row)
 
     data = get_massageLots(split_data)
-    pprint.pprint(data, sort_dicts=False, width=100)
+    # pprint.pprint(data, sort_dicts=False, width=100)
     return data
 
 

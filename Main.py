@@ -1,17 +1,20 @@
+import logging
 import time
 
-import pandas as pd
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from DBManager import prepare_data_for_db, get_db_connection, insert_message_to_db, insert_lots_to_db
+from DBManager import prepare_data_for_db, get_db_connection, insert_message_to_db
 from detecting import fetch_and_parse_first_page
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 
-from lotsDetecting import check_debtor
+from lots_integrator import lots_analyze
 from parsing import parse_message_page
 from split import split_columns
 
+# Настройка логирования
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Конфигурация Chrome
 chrome_options = Options()
@@ -37,7 +40,7 @@ while True:
 
         # Подготовка данных перед вставкой в базу
         prepared_data = prepare_data_for_db(new_messages)
-        print(prepared_data)
+        logger.info(f'Сырые сообщения: {prepared_data}')
 
         # отправка сырых собщений в БД и возврат их id
         new_id = insert_message_to_db(prepared_data, connection)
@@ -47,13 +50,13 @@ while True:
             formatted_data = split_columns(prepared_data)
 
             # отправка данных о лоте в БД
-            insert_lots_to_db(formatted_data, connection)
+            # insert_lots_to_db(formatted_data, connection)
 
             try:
-                # проверка отформатированных данных на наличие должника
-                check_debtor(formatted_data)
+                # проверка отформатированных данных на наличие должника и сравнение лота с базой
+                lots_analyze(formatted_data)
             except Exception as e:
-                print(f"Ошибка при проверке АУ и должника: {e}")
+                print(f"Ошибка при проверке должника и лота: {e}")
                 continue
 
         except Exception as e:
