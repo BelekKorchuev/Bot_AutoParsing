@@ -2,7 +2,7 @@ from bs4 import BeautifulSoup
 import hashlib
 import time
 from collections import deque
-from Main import logger
+from logScript import logger
 
 # Допустимые типы сообщений
 valid_message_types = {

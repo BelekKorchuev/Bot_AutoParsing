@@ -1,7 +1,7 @@
 import psycopg2
 from datetime import datetime
 from dotenv import load_dotenv
-from Main import logger
+from logScript import logger
 import os
 
 load_dotenv(dotenv_path='.env')

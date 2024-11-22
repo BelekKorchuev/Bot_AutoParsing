@@ -3,7 +3,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 import time
 from selenium.webdriver.support import expected_conditions as EC
-from Main import logger
+from logScript import logger
 
 
 # Функция для получения и парсинга HTML-кода по предоставленной ссылке

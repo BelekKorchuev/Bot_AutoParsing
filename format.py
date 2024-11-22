@@ -1,6 +1,6 @@
 import datetime
 import re
-from Main import logger
+from logScript import logger
 from tabulate import tabulate
 
 def filter_results_before_transfer(data):

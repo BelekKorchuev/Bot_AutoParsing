@@ -1,4 +1,4 @@
-import logging
+
 import time
 
 from selenium.webdriver.chrome.service import Service
@@ -11,10 +11,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from lots_integrator import lots_analyze
 from parsing import parse_message_page
 from split import split_columns
-
-# Настройка логирования
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from logScript import logger
 
 # Конфигурация Chrome
 chrome_options = Options()

@@ -1,5 +1,5 @@
 import asyncio
-from Main import logger
+from logScript import logger
 import os
 
 from dotenv import load_dotenv
