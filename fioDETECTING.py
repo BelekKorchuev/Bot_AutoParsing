@@ -1,6 +1,6 @@
 import asyncio
 import re
-from Main import logger
+import logging
 import os
 import json
 from dotenv import load_dotenv
@@ -27,7 +27,8 @@ engine = create_async_engine(db_url, echo=False, future=True)
 AsyncSessionLocal = sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
 
 # Настройка логирования
-logger.basicConfig(level=logger.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # Файл для хранения последних 5 обработанных ID
 LAST_PROCESSED_FILE = "last_processed_ids.json"
