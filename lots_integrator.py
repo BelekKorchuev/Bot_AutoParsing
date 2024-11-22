@@ -34,23 +34,24 @@ async def check_debtor(lots_data, session_maker):
             await conn.run_sync(metadata.reflect)
             dolzhnik = Table('dolzhnik', metadata, autoload_with=conn)
 
-            for lot in lots_data:
-                debtor_inn = lot.get("ИНН_Должника")
 
-                if not debtor_inn:
-                    logger.error(f"ИНН должника отсутствует в данных лота: {lot}")
-                    continue
+            debtor_inn = lots_data.get("ИНН_Должника")
 
-                debtor_exists = await session.execute(
-                    exists().where(dolzhnik.c.Инн_Должника == debtor_inn).select()
-                )
-                debtor_exists = debtor_exists.scalar()
+            if not debtor_inn:
+                logger.error(f"ИНН должника отсутствует в данных лота: {lots_data}")
+                return None
 
-                if not debtor_exists:
-                    logger.warning(f"Должник с ИНН {debtor_inn} из лота отсутствует в базе данных.")
-                    return None
+            debtor_exists = await session.execute(
+                exists().where(dolzhnik.c.Инн_Должника == debtor_inn).select()
+            )
+            debtor_exists = debtor_exists.scalar()
 
-                logger.info(f"Должник с ИНН {debtor_inn} из лота найден в базе данных.")
+            if not debtor_exists:
+                logger.warning(f"Должник с ИНН {debtor_inn} из лота отсутствует в базе данных.")
+                return None
+
+            logger.info(f"Должник с ИНН {debtor_inn} из лота найден в базе данных.")
+            return lots_data
 
 # Логика первой программы (ДКП или Результаты)
 async def process_data_dkp_or_results(data_list, session_maker):
@@ -467,7 +468,7 @@ async def main(data_list):
     session_maker = get_session_maker(engine)
 
     for data in data_list:
-        ckecking_dolzhnic = await check_debtor(data_list, session_maker)
+        ckecking_dolzhnic = await check_debtor(data, session_maker)
 
         if ckecking_dolzhnic is None:
             continue

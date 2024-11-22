@@ -3,33 +3,21 @@ import re
 from logScript import logger
 from tabulate import tabulate
 
+
 def filter_results_before_transfer(data):
-    """
-    Фильтрует строки на основе условий:
-    Если в "тип_сообщение" есть "резул" и в "цена" или "наименование_покупателя"
-    есть "не сост", "несост" или "не подан", то строка удаляется.
-    """
-    logger.debug("Фильтрация строк с условиями по 'тип_сообщение', 'цена', 'наименование_покупателя'")
-    result = []
+    if "резул" in data.get("тип_сообщения", "").lower():
+        logger.debug("Поиск несостоявшихся торгов в результатах")
+        customer_name = data.get("наименование_покупателя", "").lower()
+        price = str(data.get("цена", "")).lower()
+        if any(keyword in customer_name for keyword in ["не сост", "несост", "не подан"]) or \
+           any(keyword in price for keyword in ["не сост", "несост", "не подан"]):
+            logger.debug(f"Удалено: {data}")
+            return None
+        logger.info("Несостоявшихся торгов не найдено!")
+    return data
 
-    for row in data:
-        # Проверяем наличие "резул" в тип_сообщение
-        typ_soobsh = row.get("тип_сообщение", "").lower()
-        if "резул" in typ_soobsh:
-            # Проверяем условия в "цена" и "наименование_покупателя"
-            price = row.get("цена", "").lower()
-            buyer = row.get("наименование_покупателя", "").lower()
 
-            # Используем регулярное выражение для проверки слов
-            if re.search(r"(не сост|несост|не подан)", price) or \
-               re.search(r"(не сост|несост|не подан)", buyer):
-                logger.debug(f"Удалено: {row}")
-                continue  # Пропускаем эту строку
-        # Если условия не выполнены, добавляем строку в результат
-        result.append(row)
 
-    logger.debug(f"Фильтрация завершена. Оставлено строк: {len(result)} из {len(data)}")
-    return result
 
 def convert_to_date_only(column):
     """
@@ -257,10 +245,10 @@ def get_massageLots(lots):
                 # Если delete_org вернул None, значит ссылка содержит PrsTOCard или OrgToCard
                 logger.debug(f"Удаление записи с арбитром, ссылка на которого содержит PrsTOCard/OrgToCard: {record}")
                 continue  # Пропускаем добавление этой записи в cleaned_data
+        if filter_results_before_transfer(record.get('Наимн')
         cleaned_data.append(record)  # Добавляем запись в результирующий список, если условие не сработало
 
     # Фильтрация и обработка данных
-    cleaned_data = filter_results_before_transfer(cleaned_data)
     cleaned_data = process_data(cleaned_data)
 
     return cleaned_data
