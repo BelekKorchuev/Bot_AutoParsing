@@ -95,6 +95,7 @@ async def process_data_dkp_or_results(data_list, session_maker):
                         SELECT * FROM lots 
                         WHERE Действующий_номер_сообщения = :previous_message_number 
                           AND Номер_лота = :lot_number
+                          AND вид_торгов != "Оценка"
                     """)
             result_criteria_1 = await session.execute(query_criteria_1, {
                 'previous_message_number': previous_message_number,
@@ -111,6 +112,7 @@ async def process_data_dkp_or_results(data_list, session_maker):
                             SELECT * FROM lots 
                             WHERE Действующий_номер_сообщения = :previous_message_number 
                               AND Номер_лота = :lot_number
+                              AND вид_торгов != "Оценка"
                         """)
                 await session.execute(insert_delete_query, {
                     'previous_message_number': row_data['Действующий_номер_сообщения'],
@@ -121,6 +123,7 @@ async def process_data_dkp_or_results(data_list, session_maker):
                             DELETE FROM lots 
                             WHERE Действующий_номер_сообщения = :previous_message_number 
                               AND Номер_лота = :lot_number
+                              AND вид_торгов != "Оценка"
                         """)
                 await session.execute(delete_query, {
                     'previous_message_number': row_data['Действующий_номер_сообщения'],
@@ -136,6 +139,7 @@ async def process_data_dkp_or_results(data_list, session_maker):
                         SELECT * FROM lots 
                         WHERE Предыдущий_номер_сообщения_по_лот = :previous_message_number 
                           AND Номер_лота = :lot_number
+                          AND вид_торгов != "Оценка"
                     """)
             result_criteria_2 = await session.execute(query_criteria_2, {
                 'previous_message_number': previous_message_number,
@@ -152,6 +156,7 @@ async def process_data_dkp_or_results(data_list, session_maker):
                             SELECT * FROM lots 
                             WHERE Предыдущий_номер_сообщения_по_лот = :previous_message_number 
                               AND Номер_лота = :lot_number
+                              AND вид_торгов != "Оценка"
                         """)
                 await session.execute(insert_delete_query, {
                     'previous_message_number': row_data['Предыдущий_номер_сообщения_по_лот'],
@@ -162,6 +167,7 @@ async def process_data_dkp_or_results(data_list, session_maker):
                             DELETE FROM lots 
                             WHERE Предыдущий_номер_сообщения_по_лот = :previous_message_number 
                               AND Номер_лота = :lot_number
+                              AND вид_торгов != "Оценка"
                         """)
                 await session.execute(delete_query, {
                     'previous_message_number': row_data['Предыдущий_номер_сообщения_по_лот'],
@@ -176,6 +182,7 @@ async def process_data_dkp_or_results(data_list, session_maker):
                         SELECT * FROM lots 
                         WHERE Номер_дела = :case_number 
                           AND Номер_лота = :lot_number
+                          AND вид_торгов != "Оценка"
                     """)
             result_criteria_3 = await session.execute(query_criteria_3, {
                 'case_number': case_number,
@@ -192,6 +199,7 @@ async def process_data_dkp_or_results(data_list, session_maker):
                             SELECT * FROM lots 
                             WHERE Номер_дела = :case_number 
                               AND Номер_лота = :lot_number
+                              AND вид_торгов != "Оценка"
                         """)
                 await session.execute(insert_delete_query, {
                     'case_number': row_data['Номер_дела'],
@@ -202,6 +210,7 @@ async def process_data_dkp_or_results(data_list, session_maker):
                             DELETE FROM lots 
                             WHERE Номер_дела = :case_number 
                               AND Номер_лота = :lot_number
+                              AND вид_торгов != "Оценка"
                         """)
                 await session.execute(delete_query, {
                     'case_number': row_data['Номер_дела'],
@@ -251,6 +260,7 @@ async def process_data_auction_or_public(data_list, session_maker):
                                     SELECT * FROM lots 
                                     WHERE Действующий_номер_сообщения = :current_message_id 
                                       AND Номер_лота = :lot_number
+                                      AND вид_торгов != "Оценка"
                                 """)
                 result_criteria_1 = await session.execute(query_criteria_1, {
                     'current_message_id': current_message_id,
@@ -267,6 +277,7 @@ async def process_data_auction_or_public(data_list, session_maker):
                                         SELECT * FROM lots 
                                         WHERE Действующий_номер_сообщения = :current_message_id 
                                           AND Номер_лота = :lot_number
+                                          AND вид_торгов != "Оценка"
                                     """)
                     await session.execute(insert_delete_query, {
                         'current_message_id': row._mapping['Действующий_номер_сообщения'],
@@ -276,6 +287,7 @@ async def process_data_auction_or_public(data_list, session_maker):
                                         DELETE FROM lots 
                                         WHERE Действующий_номер_сообщения = :current_message_id 
                                           AND Номер_лота = :lot_number
+                                          AND вид_торгов != "Оценка"
                                     """)
                     await session.execute(delete_query, {
                         'current_message_id': row._mapping['Действующий_номер_сообщения'],
@@ -288,6 +300,7 @@ async def process_data_auction_or_public(data_list, session_maker):
                                     SELECT * FROM lots 
                                     WHERE Номер_дела = :case_number 
                                       AND Номер_лота = :lot_number
+                                      AND вид_торгов != "Оценка"
                                 """)
                 result_criteria_2 = await session.execute(query_criteria_2, {
                     'case_number': case_number,
@@ -304,6 +317,7 @@ async def process_data_auction_or_public(data_list, session_maker):
                                         SELECT * FROM lots 
                                         WHERE Номер_дела = :case_number 
                                           AND Номер_лота = :lot_number
+                                          AND вид_торгов != "Оценка"
                                     """)
                     await session.execute(insert_delete_query, {
                         'case_number': row._mapping['Номер_дела'],
@@ -313,6 +327,7 @@ async def process_data_auction_or_public(data_list, session_maker):
                                         DELETE FROM lots 
                                         WHERE Номер_дела = :case_number 
                                           AND Номер_лота = :lot_number
+                                          AND вид_торгов != "Оценка"
                                     """)
                     await session.execute(delete_query, {
                         'case_number': row._mapping['Номер_дела'],
@@ -364,6 +379,7 @@ async def process_data_evaluation(data_list, session_maker):
                     SELECT * FROM lots
                     WHERE Действующий_номер_сообщения = :current_message_id
                       AND Имущество = :lot_property
+                      AND вид_торгов = "Оценка"
                 """)
                 result_criteria_1 = await session.execute(query_criteria_1, {
                     'current_message_id': current_message_id,
@@ -379,6 +395,7 @@ async def process_data_evaluation(data_list, session_maker):
                         SELECT * FROM lots
                         WHERE Действующий_номер_сообщения = :current_message_id
                           AND Имущество = :lot_property
+                          AND вид_торгов = "Оценка"
                     """)
                     await session.execute(insert_delete_query, {
                         'current_message_id': row._mapping['Действующий_номер_сообщения'],
@@ -388,6 +405,7 @@ async def process_data_evaluation(data_list, session_maker):
                         DELETE FROM lots
                         WHERE Действующий_номер_сообщения = :current_message_id
                           AND Имущество = :lot_property
+                          AND вид_торгов = "Оценка"
                     """)
                     await session.execute(delete_query, {
                         'current_message_id': row._mapping['Действующий_номер_сообщения'],
