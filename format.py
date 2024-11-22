@@ -245,7 +245,8 @@ def get_massageLots(lots):
                 # Если delete_org вернул None, значит ссылка содержит PrsTOCard или OrgToCard
                 logger.debug(f"Удаление записи с арбитром, ссылка на которого содержит PrsTOCard/OrgToCard: {record}")
                 continue  # Пропускаем добавление этой записи в cleaned_data
-        if filter_results_before_transfer(record.get('Наимн')
+        if filter_results_before_transfer(record) is None:
+            continue
         cleaned_data.append(record)  # Добавляем запись в результирующий список, если условие не сработало
 
     # Фильтрация и обработка данных
