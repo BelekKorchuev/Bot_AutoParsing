@@ -48,7 +48,6 @@ def fetch_and_parse_first_page(driver):
 
             # Проверка типа сообщения
             if message_type in valid_message_types:
-                logger.info(f'Обнаружено релевантное сообщение типа: {message_type}')
                 # Создаем уникальный идентификатор для строки
                 msg_id = hashlib.md5((date + message_type + debtor).encode()).hexdigest()
 
