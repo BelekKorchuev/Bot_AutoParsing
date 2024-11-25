@@ -53,6 +53,13 @@ async def check_debtor(lots_data, session_maker):
             logger.info(f"Должник с ИНН {debtor_inn} из лота найден в базе данных.")
             return lots_data
 
+def is_number(value):
+    try:
+        float(value) # Попробуем преобразовать значение в число
+        return True
+    except ValueError:
+        return False
+
 # Логика первой программы (ДКП или Результаты)
 async def process_data_dkp_or_results(data_list, session_maker):
 
@@ -64,7 +71,7 @@ async def process_data_dkp_or_results(data_list, session_maker):
             case_number = str(data['Номер_дела'])
 
             # Проверка пустых полей
-            if not previous_message_number or not lot_number:
+            if not is_number(previous_message_number) or not is_number(lot_number):
                 logger.info(f"Добавляем в error_table из-за пустого значения: 'Предыдущий_номер_сообщения_по_лот'='{previous_message_number}', 'Номер_лота'='{lot_number}'.")
                 insert_error_table_query = text("""
                     INSERT INTO error_table (
