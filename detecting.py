@@ -5,7 +5,7 @@ from collections import deque
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
-
+from datetime import datetime, timedelta
 from logScript import logger
 
 # Допустимые типы сообщений
@@ -20,29 +20,54 @@ valid_message_types = {
 # Идентификаторы для проверенных сообщений, с ограничением на 1000 элементов
 checked_messages = deque(maxlen=1000)
 
-def clear_form_periodically(driver, interval=3600):
+def clear_form_periodically(driver, target_hour=0, target_minute=0, repeat_count=5, repeat_interval=5):
     """
-    Нажимает на кнопку "Очистить" с заданной периодичностью.
+    Нажимает на кнопку "Очистить" в заданное время суток (например, в 12:00 ночи), нажимая несколько раз подряд.
 
     :param driver: Объект Selenium WebDriver.
-    :param interval: Интервал в секундах между нажатиями (по умолчанию 1 час = 3600 секунд).
+    :param target_hour: Час запуска (по умолчанию 0 - полночь).
+    :param target_minute: Минута запуска (по умолчанию 0).
+    :param repeat_count: Количество последовательных нажатий (по умолчанию 5).
+    :param repeat_interval: Интервал между нажатиями в секундах (по умолчанию 5 секунд).
     """
     while True:
         try:
-            # Ожидание кнопки "Очистить"
-            WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, '//*[@id="ctl00_cphBody_imgClear"]'))
+            # Текущее время
+            now = datetime.now()
+            target_time = datetime.combine(now.date(), datetime.min.time()) + timedelta(
+                hours=target_hour, minutes=target_minute
             )
-            # Нажимаем на кнопку "Очистить"
-            clear_button = driver.find_element(By.XPATH, '//*[@id="ctl00_cphBody_imgClear"]')
-            clear_button.click()
-            logger.info(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Кнопка 'Очистить' нажата.")
+
+            # Если текущее время уже прошло заданное, берём следующий день
+            if now >= target_time:
+                target_time += timedelta(days=1)
+
+            # Вычисляем время до следующего запуска
+            sleep_time = (target_time - now).total_seconds()
+            logger.info(f"Следующее нажатие кнопки 'Очистить' запланировано на {target_time}. Спим {sleep_time:.2f} секунд.")
+
+            # Спим до нужного времени
+            time.sleep(sleep_time)
+
+            # Последовательно нажимаем на кнопку
+            for i in range(1, repeat_count + 1):
+                try:
+                    # Ждём, пока кнопка станет кликабельной
+                    WebDriverWait(driver, 10).until(
+                        EC.element_to_be_clickable((By.XPATH, '//*[@id="ctl00_cphBody_imgClear"]'))
+                    )
+                    # Нажимаем на кнопку
+                    clear_button = driver.find_element(By.XPATH, '//*[@id="ctl00_cphBody_imgClear"]')
+                    clear_button.click()
+                    logger.info(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Нажатие {i} из {repeat_count}: Кнопка 'Очистить' нажата.")
+                except Exception as e:
+                    logger.error(f"Ошибка при нажатии кнопки 'Очистить' на попытке {i}: {e}")
+
+                # Ждём перед следующим нажатием
+                time.sleep(repeat_interval)
 
         except Exception as e:
-            logger.error(f"Ошибка при нажатии на кнопку 'Очистить': {e}")
-
-        # Ждём заданный интервал перед следующим нажатием
-        time.sleep(interval)
+            logger.error(f"Ошибка в функции clear_form_periodically: {e}")
 
 
 def fetch_and_parse_first_page(driver):
