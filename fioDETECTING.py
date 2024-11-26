@@ -26,9 +26,6 @@ engine = create_async_engine(db_url, echo=False, future=True)
 # Создаем асинхронную сессию
 AsyncSessionLocal = sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
 
-# Настройка логирования
-logger.basicConfig(level=logger.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
 # Файл для хранения последних 5 обработанных ID
 LAST_PROCESSED_FILE = "last_processed_ids.json"
 

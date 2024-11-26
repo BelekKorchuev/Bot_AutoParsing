@@ -2,6 +2,10 @@ from bs4 import BeautifulSoup
 import hashlib
 import time
 from collections import deque
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.wait import WebDriverWait
+
 from logScript import logger
 
 # Допустимые типы сообщений
@@ -15,6 +19,31 @@ valid_message_types = {
 
 # Идентификаторы для проверенных сообщений, с ограничением на 1000 элементов
 checked_messages = deque(maxlen=1000)
+
+def clear_form_periodically(driver, interval=3600):
+    """
+    Нажимает на кнопку "Очистить" с заданной периодичностью.
+
+    :param driver: Объект Selenium WebDriver.
+    :param interval: Интервал в секундах между нажатиями (по умолчанию 1 час = 3600 секунд).
+    """
+    while True:
+        try:
+            # Ожидание кнопки "Очистить"
+            WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, '//*[@id="ctl00_cphBody_imgClear"]'))
+            )
+            # Нажимаем на кнопку "Очистить"
+            clear_button = driver.find_element(By.XPATH, '//*[@id="ctl00_cphBody_imgClear"]')
+            clear_button.click()
+            logger.info(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Кнопка 'Очистить' нажата.")
+
+        except Exception as e:
+            logger.error(f"Ошибка при нажатии на кнопку 'Очистить': {e}")
+
+        # Ждём заданный интервал перед следующим нажатием
+        time.sleep(interval)
+
 
 def fetch_and_parse_first_page(driver):
     url = "https://old.bankrot.fedresurs.ru/Messages.aspx?attempt=1"
