@@ -27,13 +27,6 @@ error_handler = RotatingFileHandler(error_log_file, maxBytes=5 * 1024 * 1024, ba
 error_handler.setFormatter(formatter)
 error_handler.setLevel(logging.WARNING)
 
-# Обработчик для консоли (по желанию)
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(formatter)
-console_handler.setLevel(logging.INFO)
-
 # Добавляем обработчики к логгеру
 logger.addHandler(info_handler)
 logger.addHandler(error_handler)
-logger.addHandler(console_handler)
-
