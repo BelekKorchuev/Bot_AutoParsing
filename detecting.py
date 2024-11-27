@@ -58,8 +58,15 @@ def clear_form_periodically(driver, target_hour=0, target_minute=0, repeat_count
                     )
                     # Нажимаем на кнопку
                     clear_button = driver.find_element(By.XPATH, '//*[@id="ctl00_cphBody_imgClear"]')
-                    clear_button.click()
-                    logger.info(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Нажатие {i} из {repeat_count}: Кнопка 'Очистить' нажата.")
+                    if clear_button.is_displayed():
+                        logger.info("Кнопка 'Очистить' видима. Попытка нажатия...")
+                        clear_button.click()
+                        logger.info(
+                            f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Нажатие {i} из {repeat_count}: Кнопка 'Очистить' нажата.")
+                    else:
+                        logger.warning("Кнопка 'Очистить' скрыта!")
+                    # clear_button.click()
+                    # logger.info(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Нажатие {i} из {repeat_count}: Кнопка 'Очистить' нажата.")
                 except Exception as e:
                     logger.error(f"Ошибка при нажатии кнопки 'Очистить' на попытке {i}: {e}")
 

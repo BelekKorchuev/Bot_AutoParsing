@@ -164,8 +164,9 @@ def prepare_data_for_db(raw_data):
 
 
 # Функция для вставки данных в базу данных
-def insert_message_to_db(data, connection):
-    cursor = connection.cursor()
+def insert_message_to_db(data):
+    conn = get_db_connection()
+    cursor = conn.cursor()
     insert_query = '''
     INSERT INTO messages (
         дата, тип_сообщения, должник, должник_ссылка, арбитр, арбитр_ссылка, сообщение_ссылка,
@@ -235,11 +236,11 @@ def insert_message_to_db(data, connection):
         )
 
         cursor.execute(insert_query, params)
-        connection.commit()
+        conn.commit()
         new_id = cursor.fetchone()[0]
         logger.info(f"Данные успешно вставлены с ID: {new_id}")
     except Exception as e:
         print("Ошибка при выполнении запроса:", e)
-        connection.rollback()
+        conn.rollback()
     finally:
         cursor.close()

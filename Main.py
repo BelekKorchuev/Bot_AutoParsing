@@ -20,8 +20,6 @@ chrome_options.add_argument("--disable-dev-shm-usage")
 
 # Инициализация драйвера с автоматической установкой ChromeDriver
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
-connection = get_db_connection()
-
 
 # Обёртка для запуска fetch_data в отдельном потоке
 def run_fetch_data():
@@ -46,7 +44,7 @@ def monitor_threads(threads):
 threads = []
 
 # Создаём потоки
-clear_thread = Thread(target=clear_form_periodically, args=(driver, 0, 0, 5, 5), daemon=True, name="ClearFormThread")
+clear_thread = Thread(target=clear_form_periodically, args=(driver, 16, 56, 5, 5), daemon=True, name="ClearFormThread")
 fetch_data_thread = Thread(target=run_fetch_data, daemon=True, name="FetchDataThread")
 
 # Запускаем потоки
@@ -78,7 +76,7 @@ while True:
         logger.info(f'Сырые сообщения: {prepared_data}')
 
         # отправка сырых собщений в БД и возврат их id
-        new_id = insert_message_to_db(prepared_data, connection)
+        new_id = insert_message_to_db(prepared_data)
 
         try:
             # отправка данных на форматирование и разделение сообщений по лотам
