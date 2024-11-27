@@ -44,7 +44,7 @@ def monitor_threads(threads):
 threads = []
 
 # Создаём потоки
-clear_thread = Thread(target=clear_form_periodically, args=(driver, 16, 56, 5, 5), daemon=True, name="ClearFormThread")
+clear_thread = Thread(target=clear_form_periodically, args=(driver, 0, 2, 5, 5), daemon=True, name="ClearFormThread")
 fetch_data_thread = Thread(target=run_fetch_data, daemon=True, name="FetchDataThread")
 
 # Запускаем потоки

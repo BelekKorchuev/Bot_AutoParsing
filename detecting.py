@@ -1,3 +1,6 @@
+import json
+import os
+
 from bs4 import BeautifulSoup
 import hashlib
 import time
@@ -17,10 +20,52 @@ valid_message_types = {
     'Сообщение об изменении объявления о проведении торгов'
 }
 
-# Идентификаторы для проверенных сообщений, с ограничением на 1000 элементов
-checked_messages = deque(maxlen=1000)
+# Файл для сохранения идентификаторов проверенных сообщений
+CHECKED_MESSAGES_FILE = "checked_messages.json"
 
-def clear_form_periodically(driver, target_hour=0, target_minute=0, repeat_count=5, repeat_interval=5):
+def load_checked_messages():
+    """
+    Загружает очередь из файла JSON. Если файл не существует или повреждён, создаёт новый файл с пустой очередью.
+    """
+    if os.path.exists(CHECKED_MESSAGES_FILE):
+        try:
+            with open(CHECKED_MESSAGES_FILE, "r") as file:
+                data = json.load(file)
+                logger.info(f"Файл {CHECKED_MESSAGES_FILE} успешно загружен.")
+                return deque(data, maxlen=1000)
+        except (json.JSONDecodeError, IOError) as e:
+            logger.error(f"Ошибка при чтении {CHECKED_MESSAGES_FILE}: {e}. Инициализируем пустую очередь.")
+            return initialize_checked_messages_file()
+    else:
+        logger.info(f"Файл {CHECKED_MESSAGES_FILE} не найден. Создаём новый.")
+        return initialize_checked_messages_file()
+
+def save_checked_messages(queue):
+    """
+    Сохраняет очередь в файл JSON.
+    """
+    try:
+        with open(CHECKED_MESSAGES_FILE, "w") as file:
+            json.dump(list(queue), file)
+            logger.info(f"Очередь успешно сохранена в файл {CHECKED_MESSAGES_FILE}.")
+    except IOError as e:
+        logger.error(f"Ошибка при сохранении файла {CHECKED_MESSAGES_FILE}: {e}")
+
+def initialize_checked_messages_file():
+    """
+    Создаёт новый файл с пустой очередью.
+    """
+    empty_queue = deque(maxlen=1000)
+    save_checked_messages(empty_queue)
+    return empty_queue
+
+# Загружаем очередь из файла при старте программы
+checked_messages = load_checked_messages()
+
+# # Идентификаторы для проверенных сообщений, с ограничением на 1000 элементов
+# checked_messages = deque(maxlen=1000)
+
+def clear_form_periodically(driver, target_hour=0, target_minute=2, repeat_count=5, repeat_interval=5):
     """
     Нажимает на кнопку "Очистить" в заданное время суток (например, в 12:00 ночи), нажимая несколько раз подряд.
 
@@ -65,8 +110,6 @@ def clear_form_periodically(driver, target_hour=0, target_minute=0, repeat_count
                             f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Нажатие {i} из {repeat_count}: Кнопка 'Очистить' нажата.")
                     else:
                         logger.warning("Кнопка 'Очистить' скрыта!")
-                    # clear_button.click()
-                    # logger.info(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Нажатие {i} из {repeat_count}: Кнопка 'Очистить' нажата.")
                 except Exception as e:
                     logger.error(f"Ошибка при нажатии кнопки 'Очистить' на попытке {i}: {e}")
 
@@ -128,6 +171,10 @@ def fetch_and_parse_first_page(driver):
                     logger.info('Найдено новое релевантное сообщение')
                     logger.debug(
                         f'Дата: {date}, Тип сообщения: {message_type}, Должник: {debtor}, Кем опубликовано: {published_by}')
+
+                    # Сохраняем очередь
+                    save_checked_messages(checked_messages)
+
                     return new_messages
 
     except Exception as e:
