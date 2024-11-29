@@ -18,12 +18,12 @@ logger.setLevel(logging.DEBUG)  # Устанавливаем минимальн�
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 
 # Обработчик для INFO и DEBUG
-info_handler = RotatingFileHandler(info_log_file, maxBytes=5 * 1024 * 1024, backupCount=5, encoding='utf-8')
+info_handler = RotatingFileHandler(info_log_file, maxBytes=20 * 1024 * 1024, backupCount=10, encoding='utf-8')
 info_handler.setFormatter(formatter)
 info_handler.setLevel(logging.INFO)
 
 # Обработчик для WARNING, ERROR, CRITICAL
-error_handler = RotatingFileHandler(error_log_file, maxBytes=5 * 1024 * 1024, backupCount=5, encoding='utf-8')
+error_handler = RotatingFileHandler(error_log_file, maxBytes=20 * 1024 * 1024, backupCount=5, encoding='utf-8')
 error_handler.setFormatter(formatter)
 error_handler.setLevel(logging.WARNING)
 

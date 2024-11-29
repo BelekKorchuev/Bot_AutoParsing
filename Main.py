@@ -3,7 +3,7 @@ import time
 from threading import Thread
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from DBManager import prepare_data_for_db, get_db_connection, insert_message_to_db
+from DBManager import prepare_data_for_db, insert_message_to_db
 from detecting import fetch_and_parse_first_page, clear_form_periodically
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
@@ -12,88 +12,128 @@ from lots_integrator import lots_analyze
 from parsing import parse_message_page
 from split import split_columns
 from logScript import logger
+from queue import Queue
 
 # Конфигурация Chrome
 chrome_options = Options()
 chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--disable-dev-shm-usage")
 
-# Инициализация драйвера с автоматической установкой ChromeDriver
-driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+# Функция для создания нового драйвера
+def create_driver():
+    return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
-# Обёртка для запуска fetch_data в отдельном потоке
-def run_fetch_data():
+# Функция для перезапуска драйвера
+def restart_driver(driver):
     try:
-        asyncio.run(fetch_data())
+        driver.quit()  # Завершаем текущую сессию
+    except Exception as e:
+        logger.error(f"Ошибка при завершении WebDriver: {e}")
+    return create_driver()
+
+# Функция для асинхронной обработки получения данных
+async def fetch_data_periodically():
+    try:
+        await fetch_data()
     except Exception as e:
         logger.error(f"Ошибка в fetch_data: {e}")
 
 
-def monitor_threads(threads):
+def monitor_threads(threads, restart_queue):
     """
     Мониторинг состояния потоков. Перезапускает поток, если он завершился.
     """
     while True:
-        for thread in threads:
+        for i, thread in enumerate(threads):
             if not thread.is_alive():
                 logger.error(f"Поток {thread.name} завершился. Перезапуск...")
-                thread.start()
+
+                # Перезапуск потока
+                if thread.name == "ClearFormThread":
+                    new_thread = Thread(target=clear_form_periodically, args=(17, 15, restart_queue), daemon=True,
+                                        name="ClearFormThread")
+                elif thread.name == "FetchDataThread":
+                    new_thread = Thread(target=asyncio.run, args=(fetch_data_periodically(),), daemon=True,
+                                        name="FetchDataThread")
+                else:
+                    continue
+
+                threads[i] = new_thread  # Заменяем завершившийся поток на новый
+                new_thread.start()
+
         time.sleep(5)  # Проверка каждые 5 секунд
 
-# Список потоков
-threads = []
 
-# Создаём потоки
-clear_thread = Thread(target=clear_form_periodically, args=(driver, 0, 2, 5, 5), daemon=True, name="ClearFormThread")
-fetch_data_thread = Thread(target=run_fetch_data, daemon=True, name="FetchDataThread")
+# Основной цикл программы
+def main():
+    driver = create_driver()  # Инициализация WebDriver
 
-# Запускаем потоки
-threads.append(clear_thread)
-threads.append(fetch_data_thread)
+    # Очередь для перезапуска драйвера
+    restart_queue = Queue()
 
-for thread in threads:
-    thread.start()
+    # Список потоков
+    threads = []
 
-# Мониторим потоки
-monitor_thread = Thread(target=monitor_threads, args=(threads,), daemon=True, name="MonitorThread")
-monitor_thread.start()
+    # Создаём потоки
+    clear_thread = Thread(target=clear_form_periodically, args=(17, 15, restart_queue), daemon=True, name="ClearFormThread")
+    fetch_data_thread = Thread(target=asyncio.run, args=(fetch_data_periodically(),), daemon=True, name="FetchDataThread")
 
-while True:
-    new_messages = fetch_and_parse_first_page(driver)
-    if new_messages is None:
-        print("Новых сообщений нет, продолжаем проверку...\n\n")
-        time.sleep(0.5)
-        continue
+    # Запускаем потоки
+    threads.append(clear_thread)
+    threads.append(fetch_data_thread)
 
-    link = new_messages["сообщение_ссылка"]
-    try:
-        # парсинг содержимого сообщения
-        message_content = parse_message_page(link, driver)
-        new_messages['message_content'] = message_content
+    for thread in threads:
+        thread.start()
 
-        # Подготовка данных перед вставкой в базу
-        prepared_data = prepare_data_for_db(new_messages)
-        logger.info(f'Сырые сообщения: {prepared_data}')
+    # Мониторим потоки
+    monitor_thread = Thread(target=monitor_threads, args=(threads, restart_queue), daemon=True, name="MonitorThread")
+    monitor_thread.start()
 
-        # отправка сырых собщений в БД и возврат их id
-        new_id = insert_message_to_db(prepared_data)
-
+    while True:
         try:
-            # отправка данных на форматирование и разделение сообщений по лотам
-            formatted_data = split_columns(prepared_data)
+            # Проверка, нужно ли перезапустить драйвер
+            if not restart_queue.empty():
+                restart_signal = restart_queue.get()
+                if restart_signal:
+                    logger.info("Перезапуск сессии WebDriver.")
+                    driver = restart_driver(driver)
 
+            # Получаем новые сообщения
+            new_messages = fetch_and_parse_first_page(driver)
+            if new_messages is None:
+                print("Новых сообщений нет, продолжаем проверку...\n\n")
+                time.sleep(0.5)
+                continue
+
+            link = new_messages["сообщение_ссылка"]
             try:
-                # проверка отформатированных данных на наличие должника и сравнение лота с базой
+                # Парсим содержимое сообщения
+                message_content = parse_message_page(link, driver)
+                new_messages['message_content'] = message_content
+
+                # Подготовка данных перед вставкой в БД
+                prepared_data = prepare_data_for_db(new_messages)
+                logger.info(f'Сырые сообщения: %s' , str(prepared_data))
+
+                # Вставляем данные в БД и получаем ID
+                insert_message_to_db(prepared_data)
+
+                # Форматируем данные
+                formatted_data = split_columns(prepared_data)
+
+                # Проверяем отформатированные данные
                 lots_analyze(formatted_data)
+
             except Exception as e:
-                logger.error(f"Ошибка при проверке должника и лота: {e}")
+                logger.error(f"Ошибка при обработке сообщения: {e}")
                 continue
 
         except Exception as e:
-            logger.error(f"Ошибка при форматировании и отправке данных в базу: {e}")
+            logger.error(f"Ошибка в основном цикле: {e}")
+            driver = restart_driver(driver)  # Перезапустите WebDriver
 
-    except Exception as e:
-        logger.error(f"Ошибка при парсинге страницы или вставке данных: {e}")
+        time.sleep(0.5)  # Задержка перед следующим циклом
+        print("\n \n Ожидание 0.5 секунды для следующего обновления...")
 
-    print("\n \n Ожидание 0.5 секунды для следующего обновления...")
-    time.sleep(0.5)  # Задержка 0.5 секунды перед следующим циклом проверки
+if __name__ == "__main__":
+    main()

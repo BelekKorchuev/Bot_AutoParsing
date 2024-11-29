@@ -5,10 +5,16 @@ from bs4 import BeautifulSoup
 import hashlib
 import time
 from collections import deque
+
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from datetime import datetime, timedelta
+
+from webdriver_manager.chrome import ChromeDriverManager
+
 from logScript import logger
 
 # Допустимые типы сообщений
@@ -65,15 +71,10 @@ checked_messages = load_checked_messages()
 # # Идентификаторы для проверенных сообщений, с ограничением на 1000 элементов
 # checked_messages = deque(maxlen=1000)
 
-def clear_form_periodically(driver, target_hour=0, target_minute=2, repeat_count=5, repeat_interval=5):
+def clear_form_periodically(target_hour=0, target_minute=2, restart_queue=None):
     """
-    Нажимает на кнопку "Очистить" в заданное время суток (например, в 12:00 ночи), нажимая несколько раз подряд.
-
-    :param driver: Объект Selenium WebDriver.
     :param target_hour: Час запуска (по умолчанию 0 - полночь).
     :param target_minute: Минута запуска (по умолчанию 0).
-    :param repeat_count: Количество последовательных нажатий (по умолчанию 5).
-    :param repeat_interval: Интервал между нажатиями в секундах (по умолчанию 5 секунд).
     """
     while True:
         try:
@@ -94,30 +95,16 @@ def clear_form_periodically(driver, target_hour=0, target_minute=2, repeat_count
             # Спим до нужного времени
             time.sleep(sleep_time)
 
-            # Последовательно нажимаем на кнопку
-            for i in range(1, repeat_count + 1):
-                try:
-                    # Ждём, пока кнопка станет кликабельной
-                    WebDriverWait(driver, 10).until(
-                        EC.element_to_be_clickable((By.XPATH, '//*[@id="ctl00_cphBody_imgClear"]'))
-                    )
-                    # Нажимаем на кнопку
-                    clear_button = driver.find_element(By.XPATH, '//*[@id="ctl00_cphBody_imgClear"]')
-                    if clear_button.is_displayed():
-                        logger.info("Кнопка 'Очистить' видима. Попытка нажатия...")
-                        clear_button.click()
-                        logger.info(
-                            f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Нажатие {i} из {repeat_count}: Кнопка 'Очистить' нажата.")
-                    else:
-                        logger.warning("Кнопка 'Очистить' скрыта!")
-                except Exception as e:
-                    logger.error(f"Ошибка при нажатии кнопки 'Очистить' на попытке {i}: {e}")
+            # Здесь вместо выполнения нажатий, сигнализируем основной поток
+            if restart_queue:
+                logger.info("Перезапуск сессии требуется.")
+                restart_queue.put(True)  # Отправляем сигнал в очередь
 
-                # Ждём перед следующим нажатием
-                time.sleep(repeat_interval)
+            return True
 
         except Exception as e:
             logger.error(f"Ошибка в функции clear_form_periodically: {e}")
+            return False
 
 
 def fetch_and_parse_first_page(driver):
