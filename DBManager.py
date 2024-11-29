@@ -32,6 +32,7 @@ def clean_text(text):
 
     return text
 
+
 # Функция для подготовки данных для вставки в базу данных
 def prepare_data_for_db(raw_data):
     """Приводит данные к нужному формату для вставки в базу данных"""
@@ -59,7 +60,6 @@ def prepare_data_for_db(raw_data):
     inn = clean_text(message_content.get('ИНН', ''))
     case_number = clean_text(message_content.get('№ дела', ''))
     birth_date = message_content.get('Дата рождения', '')
-    birth_date = datetime.strptime(birth_date, "%d.%m.%Y") if birth_date else None
     birth_place = clean_text(message_content.get('Место рождения', ''))
     residence = clean_text(message_content.get('Место жительства', ''))
     snils = clean_text(message_content.get('СНИЛС', ''))
@@ -80,7 +80,6 @@ def prepare_data_for_db(raw_data):
     contract_info = clean_text(message_content.get('Сведения о заключении договора', ''))
     contract_number = clean_text(message_content.get('Номер договора', ''))
     contract_date = message_content.get('Дата заключения договора', '')
-    contract_date = datetime.strptime(contract_date,"%d.%m.%Y") if contract_date else None
 
     purchase_price = message_content.get('Цена', None)
     buyer_name = clean_text(message_content.get('Наименование покупателя', ''))
@@ -99,8 +98,7 @@ def prepare_data_for_db(raw_data):
     auction_result = clean_text(message_content.get('Результат', ''))
 
     # Данные по оценке
-    evaluation_date = message_content.get('Дата определения стоимости', '')
-    evaluation_date = datetime.strptime(evaluation_date, "%d.%m.%Y") if evaluation_date else None
+    evaluation_date = clean_text(message_content.get('Дата определения стоимости', ''))
     balance_value = message_content.get('Балансовая стоимость', None)
 
     # Подготовленные данные для вставки
@@ -240,7 +238,7 @@ def insert_message_to_db(data):
         new_id = cursor.fetchone()[0]
         logger.info(f"Данные успешно вставлены с ID: {new_id}")
     except Exception as e:
-        print("Ошибка при выполнении запроса:", e)
+        logger.error("Ошибка при выполнении запроса:", e)
         conn.rollback()
     finally:
         cursor.close()
