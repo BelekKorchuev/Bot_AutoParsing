@@ -1,12 +1,8 @@
-import asyncio
 import re
-from logScript import logger
-import json
 import os
+import psycopg2
 from dotenv import load_dotenv
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import MetaData, select, insert
+from logScript import logger
 
 # Загрузка переменных окружения
 load_dotenv(dotenv_path='.env')
@@ -17,49 +13,35 @@ db_password = os.getenv("DB_PASSWORD")
 db_host = os.getenv("DB_HOST")
 db_port = os.getenv("DB_PORT")
 
-# Формируем строку подключения для SQLAlchemy с использованием asyncpg
-db_url = f"postgresql+asyncpg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
-
-# Создаем асинхронный движок SQLAlchemy
-engine = create_async_engine(db_url, echo=False, future=True)
-
-# Создаем асинхронную сессию
-AsyncSessionLocal = sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
-
+# Функции для обработки данных
 def clean_sro(sro_text):
     """
     Удаляет части вида (ИНН XXXXXXXX, ОГРН XXXXXXXXXX) из строки СРО_АУ.
     """
     return re.sub(r'\s*\(ИНН[:\s]*\d+,?\s*ОГРН[:\s]*\d+\)', '', str(sro_text)).strip()
 
-
-# Функции для обработки данных
 def extract_inn(text):
     match = re.search(r'ИНН[:\s]*(\d+)', str(text))
     return match.group(1) if match else None
 
-
 def clean_fio(text):
-    return re.sub(r'\s*\(ИНН[:\s]*\d+.*?СНИЛС.*?\)', '', str(text)).strip()
-
+    return re.sub(r'\s*\(ИНН[:\s]*\d+.*?\u0421НИЛС.*?\)', '', str(text)).strip()
 
 # Основная функция
-async def au_debtorsDetecting(data):
+def au_debtorsDetecting(data):
     # Проверка типа данных, если передан словарь, преобразуем его в список
     if isinstance(data, dict):
         data = [data]
 
-    async with AsyncSessionLocal() as session:
-        metadata = MetaData()
-        async with engine.begin() as connection:
-            await connection.run_sync(metadata.reflect)
-
-        arbitr_managers_table = metadata.tables.get('arbitr_managers')
-        dolzhnik_table = metadata.tables.get('dolzhnik')
-
-        if arbitr_managers_table is None or dolzhnik_table is None:
-            logger.error("Одна или несколько таблиц не найдены.")
-            return
+    try:
+        connection = psycopg2.connect(
+            dbname=db_name,
+            user=db_user,
+            password=db_password,
+            host=db_host,
+            port=db_port
+        )
+        cursor = connection.cursor()
 
         for message_row in data:
             try:
@@ -85,52 +67,61 @@ async def au_debtorsDetecting(data):
                     continue
 
                 # Проверка наличия арбитражного управляющего в таблице arbitr_managers
-                arbitr_manager_query = select(arbitr_managers_table.c['ИНН_АУ']).where(
-                    arbitr_managers_table.c['ИНН_АУ'] == inn_au
+                cursor.execute(
+                    """
+                    SELECT ИНН_АУ FROM arbitr_managers WHERE ИНН_АУ = %s
+                    """,
+                    (inn_au,)
                 )
-                existing_manager = await session.execute(arbitr_manager_query)
-                if existing_manager.fetchone():
+                existing_manager = cursor.fetchone()
+                if existing_manager:
                     logger.info(
                         f"ИНН {inn_au} уже существует. Запись игнорируется в таблице 'arbitr_managers'. ФИО_АУ: {raw_fio}")
                 else:
-                    insert_stmt = insert(arbitr_managers_table).values(
-                        ИНН_АУ=inn_au,
-                        ФИО_АУ=clean_fio(raw_fio),
-                        ссылка_ЕФРСБ=arbiter_link,
-                        город_АУ=address,
-                        СРО_АУ=sro,
-                        почта_ау=email
+                    cursor.execute(
+                        """
+                        INSERT INTO arbitr_managers (ИНН_АУ, ФИО_АУ, ссылка_ЕФРСБ, город_АУ, СРО_АУ, почта_ау)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        """,
+                        (inn_au, clean_fio(raw_fio), arbiter_link, address, sro, email)
                     )
-                    await session.execute(insert_stmt)
                     logger.info(f"Добавлена запись в 'arbitr_managers' с ИНН {inn_au}. ФИО_АУ: {raw_fio}")
 
                 # Проверка наличия должника в таблице dolzhnik
-                debtor_query = select(dolzhnik_table.c['Инн_Должника']).where(
-                    dolzhnik_table.c['Инн_Должника'] == message_inn
+                cursor.execute(
+                    """
+                    SELECT Инн_Должника FROM dolzhnik WHERE Инн_Должника = %s
+                    """,
+                    (message_inn,)
                 )
-                existing_debtor = await session.execute(debtor_query)
-                if existing_debtor.fetchone():
+                existing_debtor = cursor.fetchone()
+                if existing_debtor:
                     logger.info(
                         f"ИНН должника {message_inn} уже существует в таблице 'dolzhnik'. Запись игнорируется. Наименование должника: {debtor_name}")
                 else:
-                    insert_debtor_stmt = insert(dolzhnik_table).values(
-                        Инн_Должника=message_inn,
-                        Должник_текст=debtor_name,
-                        Должник_ссылка_ЕФРСБ=debtor_link,
-                        Должник_ссылка_ББ='',
-                        Номер_дела=case_number,
-                        Фл_Юл=('ЮЛ' if len(message_inn) == 10 else 'ФЛ' if len(message_inn) == 12 else ''),
-                        ЕФРСБ_ББ='ЕФРСБ',
-                        АУ_текст=clean_fio(raw_fio),
-                        ИНН_АУ=inn_au
+                    cursor.execute(
+                        """
+                        INSERT INTO dolzhnik (Инн_Должника, Должник_текст, Должник_ссылка_ЕФРСБ, Должник_ссылка_ББ, Номер_дела, Фл_Юл, ЕФРСБ_ББ, АУ_текст, ИНН_АУ)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        (message_inn, debtor_name, debtor_link, '', case_number,
+                         'ЮЛ' if len(message_inn) == 10 else 'ФЛ' if len(message_inn) == 12 else '',
+                         'ЕФРСБ', clean_fio(raw_fio), inn_au)
                     )
-                    await session.execute(insert_debtor_stmt)
                     logger.info(
                         f"Добавлена запись в 'dolzhnik' с ИНН должника {message_inn}. Наименование должника: {debtor_name}")
 
-                await session.commit()
+                connection.commit()
                 logger.info("Изменения зафиксированы.")
 
             except Exception as e:
                 logger.error(f"Ошибка при обработке: {e}")
-                await session.rollback()
+                connection.rollback()
+
+    except Exception as e:
+        logger.error(f"Ошибка подключения к базе данных: {e}")
+
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()

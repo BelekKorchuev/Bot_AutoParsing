@@ -36,4 +36,3 @@ console_handler.setLevel(logging.INFO)
 logger.addHandler(info_handler)
 logger.addHandler(error_handler)
 logger.addHandler(console_handler)
-
