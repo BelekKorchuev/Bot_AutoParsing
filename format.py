@@ -64,10 +64,10 @@ def filter_lots_by_property_type(lot):
     logger.debug("Начало фильтрации лота: %s", lot)
 
     # Берем значения из словаря
-    type_torg = lot.get("тип_сообщения", "").strip().lower()
-    klass = lot.get("классификация", "").strip()
-    imush = lot.get("описание", "").strip()
-    dataDKP = lot.get("сведения_о_заключении_договора", "").strip() if lot.get("сведения_о_заключении_договора") else ""
+    type_torg = (lot.get("тип_сообщения", "") or "").strip().lower()
+    klass = (lot.get("классификация", "") or "").strip()
+    imush = (lot.get("описание", "") or "").strip()
+    dataDKP = (lot.get("сведения_о_заключении_договора", "") or "").strip() if lot.get("сведения_о_заключении_договора") else ""
 
     logger.debug("Проверка поля 'тип_сообщения': %s", type_torg)
     logger.debug("Проверка поля 'классификация': %s", klass)
@@ -107,9 +107,10 @@ def filter_lots_by_property_type(lot):
 
 def delete_org(text):
     logger.debug(f"Удаление ссылок на PrsTOCard/OrgToCard: {text}")
-    if isinstance(text, str) and ("PrsTOCard" in text or "OrgToCard" in text):
+    if text and isinstance(text, str) and ("PrsTOCard" in text or "OrgToCard" in text):
         return None
     return text
+
 
 
 def extract_number(text):
@@ -206,7 +207,7 @@ def process_data(data):
     filtered_data = []
     for row in data:
         filtered_lot = filter_lots_by_property_type(row)
-        if filtered_lot == None:
+        if filtered_lot is None:
             logger.debug(f"Пропущено: {row}")
             continue  # Пропускаем этот лот, если функция вернула "Пропуск"
         filtered_data.append(filtered_lot)
