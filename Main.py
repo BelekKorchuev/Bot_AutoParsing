@@ -50,7 +50,7 @@ def monitor_threads(threads, restart_queue):
 
                 # Перезапуск потока
                 if thread.name == "ClearFormThread":
-                    new_thread = Thread(target=clear_form_periodically, args=(17, 15, restart_queue), daemon=True,
+                    new_thread = Thread(target=clear_form_periodically, args=(3, 1, restart_queue), daemon=True,
                                         name="ClearFormThread")
                 elif thread.name == "FetchDataThread":
                     new_thread = Thread(target=asyncio.run, args=(fetch_data_periodically(),), daemon=True,
@@ -75,7 +75,7 @@ def main():
     threads = []
 
     # Создаём потоки
-    clear_thread = Thread(target=clear_form_periodically, args=(17, 15, restart_queue), daemon=True, name="ClearFormThread")
+    clear_thread = Thread(target=clear_form_periodically, args=(3, 1, restart_queue), daemon=True, name="ClearFormThread")
     fetch_data_thread = Thread(target=asyncio.run, args=(fetch_data_periodically(),), daemon=True, name="FetchDataThread")
 
     # Запускаем потоки
