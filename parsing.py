@@ -166,8 +166,8 @@ def parse_message_page(url, driver):
             data['текст'] = pre_text.text.strip() if pre_text else ""
 
         elif "Сообщение о результатах торгов" in title:
-            text_section = soup.find('div', class_='msg')
-            data['текст'] = text_section.text.strip() if text_section else ""
+            text_section = soup.find_all('div', class_='msg')
+            data['текст'] = "; ".join(text.text.strip() for text in text_section if text.text.strip())
 
             lot_number = []
             description = []
@@ -210,8 +210,8 @@ def parse_message_page(url, driver):
                             value = cells[1].text.strip()
                             data[field] = value
 
-            text_section = soup.find('div', class_='msg')
-            data['текст'] = text_section.text.strip() if text_section else ""
+            text_section = soup.find_all('div', class_='msg')
+            data['текст'] = "; ".join(text.text.strip() for text in text_section if text.text.strip())
 
             lot_numbers = []
             lot_descriptions = []
@@ -296,8 +296,8 @@ def parse_message_page(url, driver):
                         'Балансовая стоимость': "&&& ".join(balance_values)
                     })
 
-            text_section = soup.find('div', class_='msg')
-            data['текст'] = text_section.text.strip() if text_section else ""
+            text_section = soup.find_all('div', class_='msg')
+            data['текст'] = "; ".join(text.text.strip() for text in text_section if text.text.strip())
 
     except Exception as e:
         logger.error(f'Ошибка при обработке URL {url}: {e}')
