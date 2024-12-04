@@ -3,6 +3,7 @@ import os
 import psycopg2
 from dotenv import load_dotenv
 from logScript import logger
+from city import process_address
 
 # Загрузка переменных окружения
 load_dotenv(dotenv_path='.env')
@@ -31,7 +32,7 @@ def clean_fio(text):
 def au_debtorsDetecting(data):
     # Проверка типа данных, если передан словарь, преобразуем его в список
     if isinstance(data, dict):
-        data = [data]
+        data = [process_address(data)]
 
     try:
         connection = psycopg2.connect(
@@ -48,6 +49,7 @@ def au_debtorsDetecting(data):
                 raw_fio = message_row['ФИО_АУ']
                 arbiter_link = message_row['арбитр_ссылка']
                 address = message_row['адрес_корреспонденции']
+                timezoneCity = message_row['часовой_пояс']
                 sro = clean_sro(message_row['СРО_АУ'])
                 email = message_row['почта']
                 message_inn = message_row['ИНН']
@@ -80,10 +82,10 @@ def au_debtorsDetecting(data):
                 else:
                     cursor.execute(
                         """
-                        INSERT INTO arbitr_managers (ИНН_АУ, ФИО_АУ, ссылка_ЕФРСБ, город_АУ, СРО_АУ, почта_ау)
+                        INSERT INTO arbitr_managers (ИНН_АУ, ФИО_АУ, ссылка_ЕФРСБ, город_АУ, СРО_АУ, почта_ау, часовой_пояс)
                         VALUES (%s, %s, %s, %s, %s, %s)
                         """,
-                        (inn_au, clean_fio(raw_fio), arbiter_link, address, sro, email)
+                        (inn_au, clean_fio(raw_fio), arbiter_link, address, sro, email, timezoneCity)
                     )
                     logger.info(f"Добавлена запись в 'arbitr_managers' с ИНН {inn_au}. ФИО_АУ: {raw_fio}")
 
