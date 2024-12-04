@@ -7,7 +7,7 @@ from DBManager import prepare_data_for_db, insert_message_to_db
 from detecting import fetch_and_parse_first_page, clear_form_periodically
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
-from fioDETECTING import fetch_data
+from fioDETECTING import au_debtorsDetecting
 from lots_integrator import lots_analyze
 from parsing import parse_message_page
 from split import split_columns
@@ -31,14 +31,6 @@ def restart_driver(driver):
         logger.error(f"Ошибка при завершении WebDriver: {e}")
     return create_driver()
 
-# Функция для асинхронной обработки получения данных
-async def fetch_data_periodically():
-    try:
-        await fetch_data()
-    except Exception as e:
-        logger.error(f"Ошибка в fetch_data: {e}")
-
-
 def monitor_threads(threads, restart_queue):
     """
     Мониторинг состояния потоков. Перезапускает поток, если он завершился.
@@ -50,11 +42,8 @@ def monitor_threads(threads, restart_queue):
 
                 # Перезапуск потока
                 if thread.name == "ClearFormThread":
-                    new_thread = Thread(target=clear_form_periodically, args=(17, 15, restart_queue), daemon=True,
+                    new_thread = Thread(target=clear_form_periodically, args=(3, 1, restart_queue), daemon=True,
                                         name="ClearFormThread")
-                elif thread.name == "FetchDataThread":
-                    new_thread = Thread(target=asyncio.run, args=(fetch_data_periodically(),), daemon=True,
-                                        name="FetchDataThread")
                 else:
                     continue
 
@@ -75,15 +64,11 @@ def main():
     threads = []
 
     # Создаём потоки
-    clear_thread = Thread(target=clear_form_periodically, args=(17, 15, restart_queue), daemon=True, name="ClearFormThread")
-    fetch_data_thread = Thread(target=asyncio.run, args=(fetch_data_periodically(),), daemon=True, name="FetchDataThread")
+    clear_thread = Thread(target=clear_form_periodically, args=(3, 1, restart_queue), daemon=True, name="ClearFormThread")
 
     # Запускаем потоки
     threads.append(clear_thread)
-    threads.append(fetch_data_thread)
-
-    for thread in threads:
-        thread.start()
+    clear_thread.start()
 
     # Мониторим потоки
     monitor_thread = Thread(target=monitor_threads, args=(threads, restart_queue), daemon=True, name="MonitorThread")
@@ -114,6 +99,9 @@ def main():
                 # Подготовка данных перед вставкой в БД
                 prepared_data = prepare_data_for_db(new_messages)
                 logger.info(f'Сырые сообщения: %s' , str(prepared_data))
+
+                # добавление новых АУ и должников
+                au_debtorsDetecting(prepared_data)
 
                 # Вставляем данные в БД и получаем ID
                 insert_message_to_db(prepared_data)
