@@ -83,7 +83,7 @@ def au_debtorsDetecting(data):
                     cursor.execute(
                         """
                         INSERT INTO arbitr_managers (ИНН_АУ, ФИО_АУ, ссылка_ЕФРСБ, город_АУ, СРО_АУ, почта_ау, часовой_пояс)
-                        VALUES (%s, %s, %s, %s, %s, %s)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
                         """,
                         (inn_au, clean_fio(raw_fio), arbiter_link, address, sro, email, timezoneCity)
                     )

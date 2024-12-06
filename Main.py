@@ -1,10 +1,9 @@
-import asyncio
 import time
 from threading import Thread
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from DBManager import prepare_data_for_db, insert_message_to_db
-from detecting import fetch_and_parse_first_page, clear_form_periodically
+from detecting import fetch_and_parse_first_page, clear_form_periodically, parse_all_pages
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 from fioDETECTING import au_debtorsDetecting
@@ -19,9 +18,14 @@ chrome_options = Options()
 chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--disable-dev-shm-usage")
 
+proxy = "160.223.163.31:8080"  # Замените на ваш прокси
+
 # Функция для создания нового драйвера
 def create_driver():
-    return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+    chrome_options.add_argument(f"--proxy-server={proxy}")
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+
+    return driver
 
 # Функция для перезапуска драйвера
 def restart_driver(driver):
@@ -59,6 +63,10 @@ def main():
 
     # Очередь для перезапуска драйвера
     restart_queue = Queue()
+
+    # Обход всех страниц при старте
+    logger.info("Запускаем полный парсинг всех страниц.")
+    parse_all_pages(driver)
 
     # Список потоков
     threads = []
