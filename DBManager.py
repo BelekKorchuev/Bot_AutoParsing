@@ -1,8 +1,11 @@
+import time
+
 import psycopg2
 from datetime import datetime
 from dotenv import load_dotenv
 from logScript import logger
 import os
+from psycopg2 import OperationalError
 
 load_dotenv(dotenv_path='.env')
 
@@ -14,14 +17,20 @@ db_port = os.getenv("DB_PORT")
 
 # Функция для подключения к базе данных
 def get_db_connection():
-    connection = psycopg2.connect(
-        host=db_host,
-        port=db_port,
-        database=db_name,
-        user=db_user,
-        password=db_password
-    )
-    return connection
+    try:
+        connection = psycopg2.connect(
+            host=db_host,
+            port=db_port,
+            database=db_name,
+            user=db_user,
+            password=db_password
+        )
+        return connection
+    except OperationalError as e:
+        logger.error(f"Ошибка при подключении: {e}")
+        time.sleep(5)
+        return get_db_connection()
+
 
 # Функция для очистки текста
 def clean_text(text):
