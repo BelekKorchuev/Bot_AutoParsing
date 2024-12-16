@@ -1,10 +1,9 @@
-import asyncio
 import time
 from threading import Thread
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from DBManager import prepare_data_for_db, insert_message_to_db
-from detecting import fetch_and_parse_first_page, clear_form_periodically
+from detecting import fetch_and_parse_first_page, clear_form_periodically, parse_all_pages
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 from fioDETECTING import au_debtorsDetecting
@@ -13,15 +12,33 @@ from parsing import parse_message_page
 from split import split_columns
 from logScript import logger
 from queue import Queue
+from selenium.webdriver.common.proxy import *
 
+# proxy_url = "160.86.242.23:8080"
+# proxy = Proxy({
+#     'proxyType': ProxyType.MANUAL,
+#     'httpProxy': proxy_url,
+#     'sslProxy': proxy_url,
+#     'noProxy': ''})
+
+proxy = "54.67.125.45:3128"  # Замените на ваш прокси
 # Конфигурация Chrome
 chrome_options = Options()
 chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--disable-dev-shm-usage")
+# chrome_options.add_argument(f"--proxy-server={proxy}")
+
 
 # Функция для создания нового драйвера
 def create_driver():
-    return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+    # capabilities = webdriver.DesiredCapabilities.CHROME.copy()
+    #
+    # proxy.to_capabilities(capabilities)
+    #
+    # driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), desired_capabilities=capabilities, options=chrome_options)
+    return driver
 
 # Функция для перезапуска драйвера
 def restart_driver(driver):
@@ -52,6 +69,20 @@ def monitor_threads(threads, restart_queue):
 
         time.sleep(5)  # Проверка каждые 5 секунд
 
+# Функция проверки состояния браузера
+def is_browser_alive(driver):
+    """
+    Проверяет, жив ли браузер.
+    :param driver: WebDriver instance.
+    :return: True, если браузер работает, иначе False.
+    """
+    try:
+        driver.title  # Пробуем получить заголовок текущей страницы
+        return True
+    except Exception as e:
+        logger.warning(f"Браузер не отвечает: {e}")
+        return False
+
 
 # Основной цикл программы
 def main():
@@ -59,6 +90,10 @@ def main():
 
     # Очередь для перезапуска драйвера
     restart_queue = Queue()
+
+    # Обход всех страниц при старте
+    logger.info("Запускаем полный парсинг всех страниц.")
+    parse_all_pages(driver)
 
     # Список потоков
     threads = []
@@ -76,6 +111,11 @@ def main():
 
     while True:
         try:
+            # Проверка, нужно ли перезапустить драйвер
+            if not is_browser_alive(driver):
+                logger.warning("Браузер перестал отвечать. Перезапуск...")
+                driver = restart_driver(driver)
+
             # Проверка, нужно ли перезапустить драйвер
             if not restart_queue.empty():
                 restart_signal = restart_queue.get()

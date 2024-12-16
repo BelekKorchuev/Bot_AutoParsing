@@ -5,9 +5,8 @@ from transliterate import translit
 import pytz
 from datetime import datetime
 import os
+from logScript import logger
 
-# Настройка логирования
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Подключение к базе данных
 def load_timezones_from_db():
@@ -26,7 +25,7 @@ def load_timezones_from_db():
         columns = [desc[0] for desc in cursor.description]
         timezones_dict = [dict(zip(columns, row)) for row in rows]
     except Exception as e:
-        logging.error(f"Ошибка при подключении к базе данных: {e}")
+        logger.error(f"Ошибка при подключении к базе данных: {e}")
     finally:
         if connection:
             connection.close()
@@ -44,7 +43,7 @@ def find_city_by_postal_code(postal_code):
             city_name = re.sub(r'\d+', '', city_name).strip()
             return city_name
     except Exception as e:
-        logging.error(f"Ошибка при поиске города по почтовому индексу {postal_code}: {e}")
+        logger.error(f"Ошибка при поиске города по почтовому индексу {postal_code}: {e}")
     return None
 
 
@@ -71,7 +70,7 @@ def get_msk_offset(timezone_str):
         msk_offset = int(offset - 3)
         return f"+{msk_offset}" if msk_offset > 0 else str(msk_offset)
     except Exception as e:
-        logging.error(f"Ошибка при определении смещения для {timezone_str}: {e}")
+        logger.error(f"Ошибка при определении смещения для {timezone_str}: {e}")
     return None
 
 
@@ -106,8 +105,7 @@ def process_address(data_dict):
     # Обновление словаря
     data_dict.update({
         'адрес_корреспонденции': city if city else 'Не найден',
-        'часовой_пояс': msk_offset if msk_offset is not None else 'Не найден',
-        'метод_поиска': method if method else 'Не найден'
+        'часовой_пояс': msk_offset if msk_offset is not None else 'Не найден'
     })
-
+    logger.info(f'Способом \'{method}\' найден город {city} для адресса {address} и часовой пояс={msk_offset}')
     return data_dict
