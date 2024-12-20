@@ -3,7 +3,7 @@ from threading import Thread
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from DBManager import prepare_data_for_db, insert_message_to_db
-from detecting import fetch_and_parse_first_page, clear_form_periodically, parse_all_pages
+from detecting import fetch_and_parse_first_page, clear_form_periodically, parse_all_pages_reverse
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 from fioDETECTING import au_debtorsDetecting
@@ -93,7 +93,7 @@ def main():
 
     # Обход всех страниц при старте
     logger.info("Запускаем полный парсинг всех страниц.")
-    parse_all_pages(driver)
+    parse_all_pages_reverse(driver)
 
     # Список потоков
     threads = []
