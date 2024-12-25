@@ -41,7 +41,6 @@ def clean_text(text):
 
     return text
 
-
 # Функция для подготовки данных для вставки в базу данных
 def prepare_data_for_db(raw_data):
     """Приводит данные к нужному формату для вставки в базу данных"""
@@ -168,7 +167,6 @@ def prepare_data_for_db(raw_data):
     }
 
     return prepared_data
-
 
 # Функция для вставки данных в базу данных
 def insert_message_to_db(data):
