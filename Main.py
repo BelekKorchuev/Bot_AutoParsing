@@ -33,9 +33,9 @@ def setup_virtual_display():
     """
     try:
         # Запуск Xvfb
-        xvfb_process = subprocess.Popen(['Xvfb', ':104', '-screen', '0', '1920x1080x24', '-nolisten', 'tcp'])
+        xvfb_process = subprocess.Popen(['Xvfb', ':100', '-screen', '0', '1920x1080x24', '-nolisten', 'tcp'])
         # Установка переменной окружения DISPLAY
-        os.environ["DISPLAY"] = ":104"
+        os.environ["DISPLAY"] = ":100"
         logger.info("Виртуальный дисплей успешно настроен с использованием Xvfb.")
         return xvfb_process
     except Exception as e:
@@ -48,20 +48,20 @@ def create_webdriver_with_display():
     Создает WebDriver с виртуальным дисплеем.
     """
     # Настройка виртуального дисплея
-    # xvfb_process = setup_virtual_display()
-    # if not xvfb_process:
-    #     raise RuntimeError("Не удалось настроить виртуальный дисплей.")
+    xvfb_process = setup_virtual_display()
+    if not xvfb_process:
+        raise RuntimeError("Не удалось настроить виртуальный дисплей.")
 
     # Настройка WebDriver
     chrome_options = Options()
-    # chrome_options.add_argument("--no-sandbox")
-    # chrome_options.add_argument("--disable-dev-shm-usage")
-    # chrome_options.add_argument("--disable-gpu")
-    # chrome_options.add_argument("--disable-extensions")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--disable-extensions")
     chrome_service = Service(ChromeDriverManager().install())
 
     driver = webdriver.Chrome(service=chrome_service, options=chrome_options)
-    # driver.xvfb_process = xvfb_process  # Сохраняем процесс для последующего завершения
+    driver.xvfb_process = xvfb_process  # Сохраняем процесс для последующего завершения
     return driver
 
 # очистка виртуального дисплея
@@ -116,7 +116,6 @@ def is_browser_alive(driver):
     except Exception as e:
         logger.warning(f"Браузер не отвечает: {e}")
         return False
-
 
 # Основной цикл программы
 def main():

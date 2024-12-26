@@ -69,6 +69,7 @@ def initialize_checked_messages_file():
 # Загружаем очередь из файла при старте программы
 checked_messages = load_checked_messages()
 
+# метод для периодичного перезапуска программы
 def clear_form_periodically(target_hour=0, target_minute=2, restart_queue=None):
     """
     :param target_hour: Час запуска (по умолчанию 0 - полночь).
@@ -104,7 +105,7 @@ def clear_form_periodically(target_hour=0, target_minute=2, restart_queue=None):
             logger.error(f"Ошибка в функции clear_form_periodically: {e}")
             return False
 
-
+# метод для мониторинга первой страницы
 def fetch_and_parse_first_page(driver):
     url = "https://old.bankrot.fedresurs.ru/Messages.aspx?"
     logger.info(f'[{time.strftime("%Y-%m-%d %H:%M:%S")}] Открытие основной страницы: {url}')
