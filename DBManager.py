@@ -31,7 +31,6 @@ def get_db_connection():
         time.sleep(5)
         return get_db_connection()
 
-
 # Функция для очистки текста
 def clean_text(text):
     """Удаляет лишние символы из текста и приводит его в читаемый вид"""

@@ -1,3 +1,5 @@
+import os
+import subprocess
 import time
 from threading import Thread
 from selenium.webdriver.chrome.service import Service
@@ -21,32 +23,64 @@ from selenium.webdriver.common.proxy import *
 #     'sslProxy': proxy_url,
 #     'noProxy': ''})
 
-proxy = "54.67.125.45:3128"  # Замените на ваш прокси
-# Конфигурация Chrome
-chrome_options = Options()
-chrome_options.add_argument("--no-sandbox")
-chrome_options.add_argument("--disable-dev-shm-usage")
-# chrome_options.add_argument(f"--proxy-server={proxy}")
+# proxy = "54.67.125.45:3128"  # Замените на ваш прокси
 
 
-# Функция для создания нового драйвера
-def create_driver():
+# создание виртуального дисплея
+def setup_virtual_display():
+    """
+    Настройка виртуального дисплея через Xvfb.
+    """
+    try:
+        # Запуск Xvfb
+        xvfb_process = subprocess.Popen(['Xvfb', ':104', '-screen', '0', '1920x1080x24', '-nolisten', 'tcp'])
+        # Установка переменной окружения DISPLAY
+        os.environ["DISPLAY"] = ":104"
+        logger.info("Виртуальный дисплей успешно настроен с использованием Xvfb.")
+        return xvfb_process
+    except Exception as e:
+        logger.error(f"Ошибка при настройке виртуального дисплея: {e}")
+        return None
 
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
-    # capabilities = webdriver.DesiredCapabilities.CHROME.copy()
-    #
-    # proxy.to_capabilities(capabilities)
-    #
-    # driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), desired_capabilities=capabilities, options=chrome_options)
+# создание веб драйвера с виртуальным дисплем
+def create_webdriver_with_display():
+    """
+    Создает WebDriver с виртуальным дисплеем.
+    """
+    # Настройка виртуального дисплея
+    # xvfb_process = setup_virtual_display()
+    # if not xvfb_process:
+    #     raise RuntimeError("Не удалось настроить виртуальный дисплей.")
+
+    # Настройка WebDriver
+    chrome_options = Options()
+    # chrome_options.add_argument("--no-sandbox")
+    # chrome_options.add_argument("--disable-dev-shm-usage")
+    # chrome_options.add_argument("--disable-gpu")
+    # chrome_options.add_argument("--disable-extensions")
+    chrome_service = Service(ChromeDriverManager().install())
+
+    driver = webdriver.Chrome(service=chrome_service, options=chrome_options)
+    # driver.xvfb_process = xvfb_process  # Сохраняем процесс для последующего завершения
     return driver
+
+# очистка виртуального дисплея
+def cleanup_virtual_display(driver):
+    """
+    Завершает процесс Xvfb.
+    """
+    if hasattr(driver, "xvfb_process") and driver.xvfb_process:
+        driver.xvfb_process.terminate()
+        logger.info("Процесс Xvfb завершен.")
 
 # Функция для перезапуска драйвера
 def restart_driver(driver):
     try:
+        cleanup_virtual_display(driver)
         driver.quit()  # Завершаем текущую сессию
     except Exception as e:
         logger.error(f"Ошибка при завершении WebDriver: {e}")
-    return create_driver()
+    return create_webdriver_with_display()
 
 def monitor_threads(threads, restart_queue):
     """
@@ -86,7 +120,7 @@ def is_browser_alive(driver):
 
 # Основной цикл программы
 def main():
-    driver = create_driver()  # Инициализация WebDriver
+    driver = create_webdriver_with_display()  # Инициализация WebDriver
 
     # Очередь для перезапуска драйвера
     restart_queue = Queue()
