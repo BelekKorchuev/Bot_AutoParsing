@@ -5,7 +5,7 @@ from threading import Thread
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from DBManager import prepare_data_for_db, insert_message_to_db
-from detecting import fetch_and_parse_first_page, clear_form_periodically, parse_all_pages_reverse
+from detecting import fetch_and_parse_first_page, clear_form_periodically, parse_all_pages_reverse, pop_last_elem
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 from fioDETECTING import au_debtorsDetecting
@@ -93,7 +93,7 @@ def monitor_threads(threads, restart_queue):
 
                 # Перезапуск потока
                 if thread.name == "ClearFormThread":
-                    new_thread = Thread(target=clear_form_periodically, args=(3, 1, restart_queue), daemon=True,
+                    new_thread = Thread(target=clear_form_periodically, args=(0, 2, restart_queue), daemon=True,
                                         name="ClearFormThread")
                 else:
                     continue
@@ -119,82 +119,88 @@ def is_browser_alive(driver):
 
 # Основной цикл программы
 def main():
-    driver = create_webdriver_with_display()  # Инициализация WebDriver
-
-    # Очередь для перезапуска драйвера
-    restart_queue = Queue()
-
-    # Обход всех страниц при старте
-    logger.info("Запускаем полный парсинг всех страниц.")
-    parse_all_pages_reverse(driver)
-
-    # Список потоков
-    threads = []
-
-    # Создаём потоки
-    clear_thread = Thread(target=clear_form_periodically, args=(3, 1, restart_queue), daemon=True, name="ClearFormThread")
-
-    # Запускаем потоки
-    threads.append(clear_thread)
-    clear_thread.start()
-
-    # Мониторим потоки
-    monitor_thread = Thread(target=monitor_threads, args=(threads, restart_queue), daemon=True, name="MonitorThread")
-    monitor_thread.start()
-
     while True:
-        try:
-            # Проверка, нужно ли перезапустить драйвер
-            if not is_browser_alive(driver):
-                logger.warning("Браузер перестал отвечать. Перезапуск...")
-                driver = restart_driver(driver)
+        driver = create_webdriver_with_display()  # Инициализация WebDriver
 
-            # Проверка, нужно ли перезапустить драйвер
-            if not restart_queue.empty():
-                restart_signal = restart_queue.get()
-                if restart_signal:
-                    logger.info("Перезапуск сессии WebDriver.")
+        # Очередь для перезапуска драйвера
+        restart_queue = Queue()
+
+        # Обход всех страниц при старте
+        logger.info("Запускаем полный парсинг всех страниц.")
+        signal_error = parse_all_pages_reverse(driver)
+        if signal_error is None:
+            pop_last_elem()
+            cleanup_virtual_display(driver)
+            driver.quit()  # Завершаем текущую сессию
+            continue
+
+        # Список потоков
+        threads = []
+
+        # Создаём потоки
+        clear_thread = Thread(target=clear_form_periodically, args=(3, 1, restart_queue), daemon=True, name="ClearFormThread")
+
+        # Запускаем потоки
+        threads.append(clear_thread)
+        clear_thread.start()
+
+        # Мониторим потоки
+        monitor_thread = Thread(target=monitor_threads, args=(threads, restart_queue), daemon=True, name="MonitorThread")
+        monitor_thread.start()
+
+        while True:
+            try:
+                # Проверка, нужно ли перезапустить драйвер
+                if not is_browser_alive(driver):
+                    logger.warning("Браузер перестал отвечать. Перезапуск...")
                     driver = restart_driver(driver)
 
-            # Получаем новые сообщения
-            new_messages = fetch_and_parse_first_page(driver)
-            if new_messages is None:
-                print("Новых сообщений нет, продолжаем проверку...\n\n")
-                time.sleep(0.5)
-                continue
+                # Проверка, нужно ли перезапустить драйвер
+                if not restart_queue.empty():
+                    restart_signal = restart_queue.get()
+                    if restart_signal:
+                        logger.info("Перезапуск сессии WebDriver.")
+                        driver = restart_driver(driver)
 
-            link = new_messages["сообщение_ссылка"]
-            try:
-                # Парсим содержимое сообщения
-                message_content = parse_message_page(link, driver)
-                new_messages['message_content'] = message_content
+                # Получаем новые сообщения
+                new_messages = fetch_and_parse_first_page(driver)
+                if new_messages is None:
+                    print("Новых сообщений нет, продолжаем проверку...\n\n")
+                    time.sleep(0.5)
+                    continue
 
-                # Подготовка данных перед вставкой в БД
-                prepared_data = prepare_data_for_db(new_messages)
-                logger.info(f'Сырые сообщения: %s' , str(prepared_data))
+                link = new_messages["сообщение_ссылка"]
+                try:
+                    # Парсим содержимое сообщения
+                    message_content = parse_message_page(link, driver)
+                    new_messages['message_content'] = message_content
 
-                # добавление новых АУ и должников
-                au_debtorsDetecting(prepared_data)
+                    # Подготовка данных перед вставкой в БД
+                    prepared_data = prepare_data_for_db(new_messages)
+                    logger.info(f'Сырые сообщения: %s' , str(prepared_data))
 
-                # Вставляем данные в БД и получаем ID
-                insert_message_to_db(prepared_data)
+                    # добавление новых АУ и должников
+                    au_debtorsDetecting(prepared_data)
 
-                # Форматируем данные
-                formatted_data = split_columns(prepared_data)
+                    # Вставляем данные в БД и получаем ID
+                    insert_message_to_db(prepared_data)
 
-                # Проверяем отформатированные данные
-                lots_analyze(formatted_data)
+                    # Форматируем данные
+                    formatted_data = split_columns(prepared_data)
+
+                    # Проверяем отформатированные данные
+                    lots_analyze(formatted_data)
+
+                except Exception as e:
+                    logger.error(f"Ошибка при обработке сообщения: {e}")
+                    continue
 
             except Exception as e:
-                logger.error(f"Ошибка при обработке сообщения: {e}")
-                continue
+                logger.error(f"Ошибка в основном цикле: {e}")
+                driver = restart_driver(driver)  # Перезапустите WebDriver
 
-        except Exception as e:
-            logger.error(f"Ошибка в основном цикле: {e}")
-            driver = restart_driver(driver)  # Перезапустите WebDriver
-
-        time.sleep(0.5)  # Задержка перед следующим циклом
-        print("\n \n Ожидание 0.5 секунды для следующего обновления...")
+            time.sleep(0.5)  # Задержка перед следующим циклом
+            print("\n \n Ожидание 0.5 секунды для следующего обновления...")
 
 if __name__ == "__main__":
     main()
