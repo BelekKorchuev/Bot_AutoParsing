@@ -23,7 +23,7 @@ def split_columns(SplitDB):
     if not isinstance(SplitDB, (dict, list)):
         raise ValueError(f"Ожидался словарь или список словарей. Получено: {type(SplitDB)}")
 
-    separator = "&&& "
+    separator = "&&&"
     columns_to_split = ["классификация", "номер_лота", "цена", "описание", "номер_торгов", "балансовая_стоимость", "сведения_о_заключении_договора", "наименование_покупателя"]
     # Проверяем, что указанные столбцы есть в таблице
     missing_cols = set(columns_to_split) - set(table[0].keys())
