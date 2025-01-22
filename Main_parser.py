@@ -55,6 +55,7 @@ def main():
         logger.info("Запускаем полный парсинг всех страниц.")
         pars_sagnal = parse_all_pages_reverse(driver)
         if pars_sagnal is None:
+            pop_last_elem()
             cleanup_virtual_display(driver)
             driver.quit()
             continue
@@ -131,8 +132,8 @@ def main():
                 logger.error(f"Ошибка в основном цикле: {e}")
                 driver = restart_driver(driver)
 
-                time.sleep(0.5)
-                logger.info("Ожидание 0.5 секунды для следующего обновления...")
+            time.sleep(0.5)
+            logger.info("Ожидание 0.5 секунды для следующего обновления...")
 
 if __name__ == "__main__":
     main()
