@@ -185,7 +185,6 @@ def parse_all_pages_reverse(driver):
     Парсинг всех страниц сообщений при запуске программы, начиная с последней страницы.
     """
     try:
-
         url = "https://old.bankrot.fedresurs.ru/Messages.aspx"
 
         visited_pages = set()  # Отслеживание уже обработанных страниц
@@ -314,10 +313,11 @@ def parse_all_pages_reverse(driver):
                                     continue
 
         logger.info("Обход всех страниц завершен.")
-        return True
+
     except Exception as e:
         logger.error(f'Произошла ошибка при парсинге всех страниц: {e}')
         return None
+
 # # парсинг всех страниц сверху вниз
 # def parse_all_pages(driver):
 #     """
