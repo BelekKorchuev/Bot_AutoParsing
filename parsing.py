@@ -4,14 +4,21 @@ from selenium.webdriver.support.wait import WebDriverWait
 import time
 from selenium.webdriver.support import expected_conditions as EC
 from logScript import logger
+from webdriver import restart_driver
 
 
 # Функция для получения и парсинга HTML-кода по предоставленной ссылке
 def parse_message_page(url, driver):
     try:
         logger.info(f'Переход по ссылке: {url}')
-        # Переход по ссылке
-        driver.get(url)
+        try:
+            driver.get(url)
+        except Exception as e:
+            logger.error(f'не получилось открыть ссылку в parse_message_page: {e}')
+            driver = restart_driver(driver)
+            driver.get(url)
+            logger.info(f'Повторная попытка открытия ссылки')
+
         WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.CLASS_NAME, 'red_small'))
         )
@@ -298,9 +305,8 @@ def parse_message_page(url, driver):
 
             text_section = soup.find_all('div', class_='msg')
             data['текст'] = "; ".join(text.text.strip() for text in text_section if text.text.strip())
+        return data
 
     except Exception as e:
         logger.error(f'Ошибка при обработке URL {url}: {e}')
-        data = {}
-
-    return data
+        return None

@@ -7,6 +7,7 @@ from collections import deque
 from datetime import datetime, timedelta
 
 from selenium.webdriver.common.by import By
+from selenium.webdriver.ie.webdriver import WebDriver
 from selenium.webdriver.support import expected_conditions as EC
 
 from selenium.webdriver.support.wait import WebDriverWait
@@ -17,6 +18,7 @@ from logScript import logger
 from lots_integrator import lots_analyze
 from parsing import parse_message_page
 from split import split_columns
+from webdriver import restart_driver
 
 # Допустимые типы сообщений
 valid_message_types = {
@@ -120,8 +122,13 @@ def fetch_and_parse_first_page(driver):
     logger.info(f'[{time.strftime("%Y-%m-%d %H:%M:%S")}] Открытие основной страницы: {url}')
 
     try:
-        # Открываем страницу
-        driver.get(url)
+        try:
+            driver.get(url)
+        except Exception as e:
+            logger.error(f'не получилось зайти на страницу сообщений: {e}')
+            driver = restart_driver(driver)
+            driver.get(url)
+            logger.info(f'Повторная попытка открытия ссылки')
         time.sleep(1)  # Ждем 1 секунду для загрузки контента
 
         # Получаем HTML-код страницы
@@ -176,8 +183,8 @@ def fetch_and_parse_first_page(driver):
 
     except Exception as e:
         logger.error(f'Ошибка при обработке страницы {url}: {e}')
-
-    return None
+        return None
+    return "not yet"
 
 # парсинг всех страниц снизу верх
 def parse_all_pages_reverse(driver):
@@ -188,8 +195,8 @@ def parse_all_pages_reverse(driver):
         url = "https://old.bankrot.fedresurs.ru/Messages.aspx"
 
         visited_pages = set()  # Отслеживание уже обработанных страниц
-
         driver.get(url)
+
         time.sleep(2)
         logger.info(f'[{time.strftime("%Y-%m-%d %H:%M:%S")}] Начало обхода всех страниц (снизу вверх): {url}')
         soup = BeautifulSoup(driver.page_source, 'html.parser')
@@ -213,6 +220,7 @@ def parse_all_pages_reverse(driver):
         time.sleep(5)
         page_numbers = ['20', '19', '18', '17', '16', '15', '14', '13', '12', '11',
                         '...', '9', '8', '7', '6', '5', '4', '3', '2', '1']
+
 
         for page_number in page_numbers:
             urlll = "https://old.bankrot.fedresurs.ru/Messages.aspx"
@@ -310,13 +318,12 @@ def parse_all_pages_reverse(driver):
 
                                 except Exception as e:
                                     logger.error(f"Ошибка при обработке сообщения: {e}")
-                                    continue
-
-        logger.info("Обход всех страниц завершен.")
+                                    return Exception
 
     except Exception as e:
         logger.error(f'Произошла ошибка при парсинге всех страниц: {e}')
         return None
+
 
 # # парсинг всех страниц сверху вниз
 # def parse_all_pages(driver):

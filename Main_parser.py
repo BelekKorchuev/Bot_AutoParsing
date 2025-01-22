@@ -1,20 +1,17 @@
-import os
-import subprocess
 import time
 from threading import Thread
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
 from DBManager import prepare_data_for_db, insert_message_to_db
 from detecting import fetch_and_parse_first_page, clear_form_periodically, parse_all_pages_reverse, pop_last_elem
-from selenium import webdriver
-from webdriver_manager.chrome import ChromeDriverManager
+
 from fioDETECTING import au_debtorsDetecting
 from lots_integrator import lots_analyze
 from parsing import parse_message_page
 from split import split_columns
 from logScript import logger
 from queue import Queue
-from selenium.webdriver.common.proxy import *
+from webdriver import create_webdriver_with_display, cleanup_virtual_display, is_browser_alive, restart_driver
+
+# from selenium.webdriver.common.proxy import *
 
 # proxy_url = "160.86.242.23:8080"
 # proxy = Proxy({
@@ -24,63 +21,6 @@ from selenium.webdriver.common.proxy import *
 #     'noProxy': ''})
 
 # proxy = "54.67.125.45:3128"  # Замените на ваш прокси
-
-
-# создание виртуального дисплея
-def setup_virtual_display():
-    """
-    Настройка виртуального дисплея через Xvfb.
-    """
-    try:
-        # Запуск Xvfb
-        xvfb_process = subprocess.Popen(['Xvfb', ':100', '-screen', '0', '1920x1080x24', '-nolisten', 'tcp'])
-        # Установка переменной окружения DISPLAY
-        os.environ["DISPLAY"] = ":100"
-        logger.info("Виртуальный дисплей успешно настроен с использованием Xvfb.")
-        return xvfb_process
-    except Exception as e:
-        logger.error(f"Ошибка при настройке виртуального дисплея: {e}")
-        return None
-
-# создание веб драйвера с виртуальным дисплем
-def create_webdriver_with_display():
-    """
-    Создает WebDriver с виртуальным дисплеем.
-    """
-    # Настройка виртуального дисплея
-    xvfb_process = setup_virtual_display()
-    if not xvfb_process:
-        raise RuntimeError("Не удалось настроить виртуальный дисплей.")
-
-    # Настройка WebDriver
-    chrome_options = Options()
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--disable-extensions")
-    chrome_service = Service(ChromeDriverManager().install())
-
-    driver = webdriver.Chrome(service=chrome_service, options=chrome_options)
-    driver.xvfb_process = xvfb_process  # Сохраняем процесс для последующего завершения
-    return driver
-
-# очистка виртуального дисплея
-def cleanup_virtual_display(driver):
-    """
-    Завершает процесс Xvfb.
-    """
-    if hasattr(driver, "xvfb_process") and driver.xvfb_process:
-        driver.xvfb_process.terminate()
-        logger.info("Процесс Xvfb завершен.")
-
-# Функция для перезапуска драйвера
-def restart_driver(driver):
-    try:
-        cleanup_virtual_display(driver)
-        driver.quit()  # Завершаем текущую сессию
-    except Exception as e:
-        logger.error(f"Ошибка при завершении WebDriver: {e}")
-    return create_webdriver_with_display()
 
 def monitor_threads(threads, restart_queue):
     """
@@ -103,20 +43,6 @@ def monitor_threads(threads, restart_queue):
 
         time.sleep(5)  # Проверка каждые 5 секунд
 
-# Функция проверки состояния браузера
-def is_browser_alive(driver):
-    """
-    Проверяет, жив ли браузер.
-    :param driver: WebDriver instance.
-    :return: True, если браузер работает, иначе False.
-    """
-    try:
-        driver.title  # Пробуем получить заголовок текущей страницы
-        return True
-    except Exception as e:
-        logger.warning(f"Браузер не отвечает: {e}")
-        return False
-
 # Основной цикл программы
 def main():
     while True:
@@ -127,11 +53,10 @@ def main():
 
         # Обход всех страниц при старте
         logger.info("Запускаем полный парсинг всех страниц.")
-        signal_error = parse_all_pages_reverse(driver)
-        if signal_error is None:
-            pop_last_elem()
+        pars_sagnal = parse_all_pages_reverse(driver)
+        if pars_sagnal is None:
             cleanup_virtual_display(driver)
-            driver.quit()  # Завершаем текущую сессию
+            driver.quit()
             continue
 
         # Список потоков
@@ -154,6 +79,7 @@ def main():
                 if not is_browser_alive(driver):
                     logger.warning("Браузер перестал отвечать. Перезапуск...")
                     driver = restart_driver(driver)
+                    continue
 
                 # Проверка, нужно ли перезапустить драйвер
                 if not restart_queue.empty():
@@ -161,12 +87,18 @@ def main():
                     if restart_signal:
                         logger.info("Перезапуск сессии WebDriver.")
                         driver = restart_driver(driver)
+                        continue
 
                 # Получаем новые сообщения
                 new_messages = fetch_and_parse_first_page(driver)
-                if new_messages is None:
-                    print("Новых сообщений нет, продолжаем проверку...\n\n")
+                if "not yet" in new_messages:
+                    logger.warning("Новых сообщений нет, продолжаем проверку...\n\n")
                     time.sleep(0.5)
+                    continue
+
+                if new_messages is None:
+                    logger.error(f"поизошла ошибка в fetch_and_parse_first_page: {e}")
+                    driver = restart_driver(driver)
                     continue
 
                 link = new_messages["сообщение_ссылка"]
@@ -197,10 +129,10 @@ def main():
 
             except Exception as e:
                 logger.error(f"Ошибка в основном цикле: {e}")
-                driver = restart_driver(driver)  # Перезапустите WebDriver
+                driver = restart_driver(driver)
 
-            time.sleep(0.5)  # Задержка перед следующим циклом
-            logger.info("Ожидание 0.5 секунды для следующего обновления...")
+                time.sleep(0.5)
+                logger.info("Ожидание 0.5 секунды для следующего обновления...")
 
 if __name__ == "__main__":
     main()
