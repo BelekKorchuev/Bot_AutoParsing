@@ -92,14 +92,29 @@ def au_debtorsDetecting(data):
                 # Проверка наличия должника в таблице dolzhnik
                 cursor.execute(
                     """
-                    SELECT Инн_Должника FROM dolzhnik WHERE Инн_Должника = %s
+                    SELECT Инн_Должника, ИНН_АУ FROM dolzhnik WHERE Инн_Должника = %s
                     """,
                     (message_inn,)
                 )
                 existing_debtor = cursor.fetchone()
                 if existing_debtor:
-                    logger.info(
-                        f"ИНН должника {message_inn} уже существует в таблице 'dolzhnik'. Запись игнорируется. Наименование должника: {debtor_name}")
+                    # Проверяем, совпадает ли ИНН_АУ с тем, что уже есть в базе
+                    existing_inn_au = existing_debtor[1]
+                    if existing_inn_au != inn_au:
+                        # Если арбитражный управляющий новый, обновляем данные
+                        cursor.execute(
+                            """
+                            UPDATE dolzhnik
+                            SET ИНН_АУ = %s, Статус_АУ = 'Новый АУ'
+                            WHERE Инн_Должника = %s
+                            """,
+                            (inn_au, message_inn)
+                        )
+                        logger.info(
+                            f"Для должника с ИНН {message_inn} обновлен арбитражный управляющий на ИНН {inn_au}. Статус АУ установлен как 'Новый АУ'.")
+                    else:
+                        logger.info(
+                            f"ИНН должника {message_inn} уже существует в таблице 'dolzhnik'. Запись игнорируется. Наименование должника: {debtor_name}")
                 else:
                     cursor.execute(
                         """
