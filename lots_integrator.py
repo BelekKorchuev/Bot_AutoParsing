@@ -369,7 +369,6 @@ async def process_data_auction_or_public(data_list, session_maker):
                 logger.error(f"Ошибка при обработке записи: {e}")
                 await session.rollback()
 
-
 # Логика третьей программы (Оценка)
 async def process_data_evaluation(data_list, session_maker):
     async with session_maker() as session:
@@ -486,7 +485,6 @@ async def process_data_evaluation(data_list, session_maker):
                 logger.error(f"Ошибка при обработке записи: {e}")
                 await session.rollback()
 
-
 # Основная функция выбора логики обработки данных
 async def main(data_list):
     engine = get_engine()
@@ -511,10 +509,7 @@ async def main(data_list):
         else:
             logger.warning(f"Неизвестное значение 'вид_торгов': {massage_type}. Пропускаем запись.")
 
-
-
 def lots_analyze(data):
    logger.info("Начинаем сравнение лотов.")
    asyncio.run(main(data))
    logger.info("Лоты сравнены.")
-

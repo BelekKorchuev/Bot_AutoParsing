@@ -16,9 +16,6 @@ def filter_results_before_transfer(data):
         logger.info("Несостоявшихся торгов не найдено!")
     return data
 
-
-
-
 def convert_to_date_only(column):
     """
     Преобразует значения столбца в формат дд.мм.гггг.
@@ -33,7 +30,6 @@ def convert_to_date_only(column):
         for x in column
     ]
 
-
 def price_text(priceN):
     logger.debug(f"Обработка строки цены: {priceN}")
     if priceN:
@@ -42,7 +38,6 @@ def price_text(priceN):
         logger.debug(f"Найденная цена: {result}")
         return result
     return None
-
 
 def rename_type_message(message_type):
     logger.debug(f"Переименование типа сообщения: {message_type}")
@@ -58,7 +53,6 @@ def rename_type_message(message_type):
         elif re.search(r"аукц|конкур", message_type.lower()):
             return "Аукцион"
     return message_type
-
 
 def filter_lots_by_property_type(lot):
     logger.debug("Начало фильтрации лота: %s", lot)
@@ -104,26 +98,21 @@ def filter_lots_by_property_type(lot):
     logger.debug("Лот прошёл все проверки: %s", lot)
     return lot
 
-
 def delete_org(text):
     logger.debug(f"Удаление ссылок на PrsTOCard/OrgToCard: {text}")
     if text and isinstance(text, str) and ("PrsTOCard" in text or "OrgToCard" in text):
         return None
     return text
 
-
-
 def extract_number(text):
     logger.debug(f"Извлечение номера из текста: {text}")
     match = re.search(r'№(\d+)', text)
     return match.group(1) if match else None
 
-
 def extract_date(text):
     logger.debug(f"Извлечение даты из текста: {text}")
     match = re.search(r'(\d{2}\.\d{2}\.\d{4})', text)
     return match.group(1) if match else None
-
 
 def clean_special_chars(text):
     logger.debug(f"Очистка строки от специальных символов: {text}")
@@ -132,7 +121,6 @@ def clean_special_chars(text):
         text = re.sub(r'[^\x20-\x7Eа-яА-ЯёЁ]', ' ', text).strip()
         return re.sub(' +', ' ', text)
     return text
-
 
 def remove_rows_with_cancelled_messages(data):
     logger.debug("Удаление строк с аннулированными сообщениями")
@@ -234,7 +222,6 @@ def process_data(data):
     logger.info(f"Обработка завершена. Отфильтровано лотов: {len(processed_data)}")
     print(tabulate(processed_data, headers="keys", tablefmt="grid"))
     return processed_data
-
 
 def get_massageLots(lots):
     data = lots.copy()  # Создание копии данных, чтобы не изменять исходный список

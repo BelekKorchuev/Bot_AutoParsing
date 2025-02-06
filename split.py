@@ -11,7 +11,6 @@ def ensure_list(data):
     else:
         raise ValueError(f"Ожидались данные в формате dict или list, получено: {type(data)}")
 
-
 def split_columns(SplitDB):
     """
     Разделяет выбранные столбцы таблицы по заданному разделителю, оставляя остальные столбцы в каждой строке.
