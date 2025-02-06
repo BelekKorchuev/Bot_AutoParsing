@@ -28,9 +28,9 @@ def create_webdriver_with_display():
     Создает WebDriver с виртуальным дисплеем.
     """
     # Настройка виртуального дисплея
-    xvfb_process = setup_virtual_display()
-    if not xvfb_process:
-        raise RuntimeError("Не удалось настроить виртуальный дисплей.")
+    # xvfb_process = setup_virtual_display()
+    # if not xvfb_process:
+    #     raise RuntimeError("Не удалось настроить виртуальный дисплей.")
 
     # Настройка WebDriver
     chrome_options = Options()
@@ -41,7 +41,7 @@ def create_webdriver_with_display():
     chrome_service = Service(ChromeDriverManager().install())
 
     driver = webdriver.Chrome(service=chrome_service, options=chrome_options)
-    driver.xvfb_process = xvfb_process  # Сохраняем процесс для последующего завершения
+    # driver.xvfb_process = xvfb_process  # Сохраняем процесс для последующего завершения
     return driver
 
 # очистка виртуального дисплея

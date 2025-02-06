@@ -69,6 +69,7 @@ async def process_data_dkp_or_results(data_list, session_maker):
             previous_message_number = str(data['Предыдущий_номер_сообщения_по_лот'])
             lot_number = str(data['Номер_лота'])
             case_number = str(data['Номер_дела'])
+            data['Статус_лота'] = "Новый лот"
 
             # Проверка пустых полей
             if not is_number(previous_message_number) or not is_number(lot_number):
@@ -80,14 +81,14 @@ async def process_data_dkp_or_results(data_list, session_maker):
                         Классификация_имущества, Цена, Предыдущий_номер_сообщения_по_лот,
                         Дата_публикации_предыдущего_сообщ, Организатор_торгов, Торговая_площадка,
                         Статус_ДКП, Статус_сообщения_о_результатах_то, ЕФРСБ_ББ, Должник_текст,
-                        вид_торгов, Дата_публикации_сообщения_ДКП, Дата_публикации_сообщения_о_резул
+                        вид_торгов, Дата_публикации_сообщения_ДКП, Дата_публикации_сообщения_о_резул, Стацтус_лота
                     ) VALUES (
                         :ИНН_Должника, :Дата_публикации, :Дата_начала_торгов, :Дата_окончания, :Номер_дела,
                         :Действующий_номер_сообщения, :Номер_лота, :Ссылка_на_сообщение_ЕФРСБ, :Имущество,
                         :Классификация_имущества, :Цена, :Предыдущий_номер_сообщения_по_лот,
                         :Дата_публикации_предыдущего_сообщ, :Организатор_торгов, :Торговая_площадка,
                         :Статус_ДКП, :Статус_сообщения_о_результатах_то, :ЕФРСБ_ББ, :Должник_текст,
-                        :вид_торгов, :Дата_публикации_сообщения_ДКП, :Дата_публикации_сообщения_о_резул
+                        :вид_торгов, :Дата_публикации_сообщения_ДКП, :Дата_публикации_сообщения_о_резул, :Статус_лота
                     )
                 """)
                 await session.execute(insert_error_table_query, {k: str(v) if v is not None else None for k, v in data.items()})
@@ -110,6 +111,8 @@ async def process_data_dkp_or_results(data_list, session_maker):
             })
             matching_rows_criteria_1 = result_criteria_1.fetchall()
             logger.info(f"Критерий 1 найдено совпадений: {len(matching_rows_criteria_1)}.")
+            if matching_rows_criteria_1:
+                data['Статус_лота'] = "На обновление"
 
             for row in matching_rows_criteria_1:
                 row_data = row._mapping
@@ -155,6 +158,9 @@ async def process_data_dkp_or_results(data_list, session_maker):
             matching_rows_criteria_2 = result_criteria_2.fetchall()
             logger.info(f"Критерий 2 найдено совпадений: {len(matching_rows_criteria_2)}.")
 
+            if matching_rows_criteria_2:
+                data['Статус_лота'] = "На обновление"
+
             for row in matching_rows_criteria_2:
                 row_data = row._mapping
                 logger.info(f"Переносим строку в delete_lots: {row_data}.")
@@ -198,6 +204,9 @@ async def process_data_dkp_or_results(data_list, session_maker):
             matching_rows_criteria_3 = result_criteria_3.fetchall()
             logger.info(f"Критерий 3 найдено совпадений: {len(matching_rows_criteria_3)}.")
 
+            if matching_rows_criteria_3:
+                data['Статус_лота'] = "На обновление"
+
             for row in matching_rows_criteria_3:
                 row_data = row._mapping
                 logger.info(f"Переносим строку в delete_lots: {row_data}.")
@@ -229,23 +238,23 @@ async def process_data_dkp_or_results(data_list, session_maker):
             # Добавление новой строки в lots
             logger.info(f"Добавляем новую строку в lots: {data}.")
             insert_query = text("""
-                        INSERT INTO lots (
-                            ИНН_Должника, Дата_публикации, Дата_начала_торгов, Дата_окончания, Номер_дела,
-                            Действующий_номер_сообщения, Номер_лота, Ссылка_на_сообщение_ЕФРСБ, Имущество,
-                            Классификация_имущества, Цена, Предыдущий_номер_сообщения_по_лот,
-                            Дата_публикации_предыдущего_сообщ, Организатор_торгов, Торговая_площадка,
-                            Статус_ДКП, Статус_сообщения_о_результатах_то, ЕФРСБ_ББ, Должник_текст,
-                            вид_торгов, Дата_публикации_сообщения_ДКП, Дата_публикации_сообщения_о_резул
-                        ) VALUES (
-                            :ИНН_Должника, :Дата_публикации, :Дата_начала_торгов, :Дата_окончания, :Номер_дела,
-                            :Действующий_номер_сообщения, :Номер_лота, :Ссылка_на_сообщение_ЕФРСБ, :Имущество,
-                            :Классификация_имущества, :Цена, :Предыдущий_номер_сообщения_по_лот,
-                            :Дата_публикации_предыдущего_сообщ, :Организатор_торгов, :Торговая_площадка,
-                            :Статус_ДКП, :Статус_сообщения_о_результатах_то, :ЕФРСБ_ББ, :Должник_текст,
-                            :вид_торгов, :Дата_публикации_сообщения_ДКП, :Дата_публикации_сообщения_о_резул
-                        )
-                    """)
-            await session.execute(insert_query, {k: str(v) if v is not None else None for k, v in data.items()})
+                                    INSERT INTO lots (
+                                        ИНН_Должника, Дата_публикации, Дата_начала_торгов, Дата_окончания, Номер_дела,
+                                        Действующий_номер_сообщения, Номер_лота, Ссылка_на_сообщение_ЕФРСБ, Имущество,
+                                        Классификация_имущества, Цена, Предыдущий_номер_сообщения_по_лот,
+                                        Дата_публикации_предыдущего_сообщ, Организатор_торгов, Торговая_площадка,
+                                        Статус_ДКП, Статус_сообщения_о_результатах_то, ЕФРСБ_ББ, Должник_текст,
+                                        вид_торгов, Дата_публикации_сообщения_ДКП, Дата_публикации_сообщения_о_резул, Статус_лота
+                                    ) VALUES (
+                                        :ИНН_Должника, :Дата_публикации, :Дата_начала_торгов, :Дата_окончания, :Номер_дела,
+                                        :Действующий_номер_сообщения, :Номер_лота, :Ссылка_на_сообщение_ЕФРСБ, :Имущество,
+                                        :Классификация_имущества, :Цена, :Предыдущий_номер_сообщения_по_лот,
+                                        :Дата_публикации_предыдущего_сообщ, :Организатор_торгов, :Торговая_площадка,
+                                        :Статус_ДКП, :Статус_сообщения_о_результатах_то, :ЕФРСБ_ББ, :Должник_текст,
+                                        :вид_торгов, :Дата_публикации_сообщения_ДКП, :Дата_публикации_сообщения_о_резул, :Статус_лота
+                                    )
+                                """)
+            await session.execute(insert_query, data)
             await session.commit()
             logger.info("Новая строка успешно добавлена в lots.")
 
@@ -258,6 +267,7 @@ async def process_data_auction_or_public(data_list, session_maker):
                 current_message_id = record['Действующий_номер_сообщения']
                 case_number = record['Номер_дела']
                 lot_number = record['Номер_лота']
+                record['Статус_лота'] = "Новый лот"
 
                 # Логика проверки критериев и обновления данных (Критерии 1, 2)
                 # Критерий 1: Действующий_номер_сообщения и Номер_лота
@@ -276,6 +286,9 @@ async def process_data_auction_or_public(data_list, session_maker):
                 matching_rows_criteria_1 = result_criteria_1.fetchall()
                 logger.info(
                     f"Найдено записей по критерию 1 (совпадение по Действующий_номер_сообщения и Номер_лота): {len(matching_rows_criteria_1)}.")
+
+                if matching_rows_criteria_1:
+                    record['Статус_лота'] = "На обновление"
 
                 for row in matching_rows_criteria_1:
                     logger.info(f"Переносим запись в delete_lots: {row._mapping}")
@@ -317,6 +330,9 @@ async def process_data_auction_or_public(data_list, session_maker):
                 logger.info(
                     f"Найдено записей по критерию 2 (совпадение по Номер_дела и Номер_лота): {len(matching_rows_criteria_2)}.")
 
+                if matching_rows_criteria_2:
+                    record['Статус_лота'] = "На обновление"
+
                 for row in matching_rows_criteria_2:
                     logger.info(f"Переносим запись в delete_lots: {row._mapping}")
                     insert_delete_query = text("""
@@ -350,14 +366,14 @@ async def process_data_auction_or_public(data_list, session_maker):
                                         Классификация_имущества, Цена, Предыдущий_номер_сообщения_по_лот,
                                         Дата_публикации_предыдущего_сообщ, Организатор_торгов, Торговая_площадка,
                                         Статус_ДКП, Статус_сообщения_о_результатах_то, ЕФРСБ_ББ, Должник_текст,
-                                        вид_торгов, Дата_публикации_сообщения_ДКП, Дата_публикации_сообщения_о_резул
+                                        вид_торгов, Дата_публикации_сообщения_ДКП, Дата_публикации_сообщения_о_резул, Статус_лота
                                     ) VALUES (
                                         :ИНН_Должника, :Дата_публикации, :Дата_начала_торгов, :Дата_окончания, :Номер_дела,
                                         :Действующий_номер_сообщения, :Номер_лота, :Ссылка_на_сообщение_ЕФРСБ, :Имущество,
                                         :Классификация_имущества, :Цена, :Предыдущий_номер_сообщения_по_лот,
                                         :Дата_публикации_предыдущего_сообщ, :Организатор_торгов, :Торговая_площадка,
                                         :Статус_ДКП, :Статус_сообщения_о_результатах_то, :ЕФРСБ_ББ, :Должник_текст,
-                                        :вид_торгов, :Дата_публикации_сообщения_ДКП, :Дата_публикации_сообщения_о_резул
+                                        :вид_торгов, :Дата_публикации_сообщения_ДКП, :Дата_публикации_сообщения_о_резул, :Статус_лота
                                     )
                                 """)
 
@@ -368,6 +384,36 @@ async def process_data_auction_or_public(data_list, session_maker):
             except Exception as e:
                 logger.error(f"Ошибка при обработке записи: {e}")
                 await session.rollback()
+
+
+async def canceled_message(data_list, session_maker):
+    async with session_maker() as session:
+        for data in data_list:
+            # Получаем значение Предыдущий_номер_сообщения_по_лот
+            previous_message_number = data.get('Предыдущий_номер_сообщения_по_лот')
+
+            if not previous_message_number:
+                logger.info(f"Предыдущий номер сообщения не указан для данных: {data}")
+                continue
+
+            # Логируем начало обработки
+            logger.info(
+                f"Обрабатываем отмененные сообщения по номеру='{previous_message_number}'.")
+
+            # Формируем запрос на обновление статуса лота
+            update_query = text("""
+                UPDATE lots
+                SET Статус_лота = 'На удаление'
+                WHERE Действующий_номер_сообщения = :previous_message_number
+            """)
+
+            # Выполняем обновление
+            result = await session.execute(update_query, {'previous_message_number': previous_message_number})
+            await session.commit()
+
+            # Логируем успешное обновление
+            logger.info(
+                f"Статусы лота обновлены на 'На удаление' для лотов с номером сообщения='{previous_message_number}'.")
 
 # Логика третьей программы (Оценка)
 async def process_data_evaluation(data_list, session_maker):
@@ -506,6 +552,9 @@ async def main(data_list):
         elif massage_type == "Оценка":
             logger.info(f"Вид торгов: {massage_type}")
             await process_data_evaluation([data], session_maker)
+        elif massage_type == "Сообщение об отмене":
+            logger.info(f"Вид торгов: {massage_type}")
+            await canceled_message([data], session_maker)
         else:
             logger.warning(f"Неизвестное значение 'вид_торгов': {massage_type}. Пропускаем запись.")
 

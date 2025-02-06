@@ -72,7 +72,22 @@ def parse_message_page(url, driver):
                         value = cells[1].text.strip()
                         data[field] = value
 
-        if "Сведения о заключении договора" in title:
+        if "Сообщение об отмене сообщения об объявлении торгов или сообщения о результатах торгов" in title:
+            # Поиск секции "Публикуемые сведения"
+            cancel_section = soup.find('div', string="Публикуемые сведения")
+            if cancel_section:
+                cancel_table = cancel_section.find_next("table")
+                if cancel_table:
+                    rows = cancel_table.find_all('tr')
+                    for row in rows:
+                        cells = row.find_all('td')
+                        if len(cells) == 2 and cells[0].text.strip() == "Отмененное сообщение":
+                            data["Объявление о проведении торгов"] = cells[1].text.strip()
+                            break  # Достаточно первой найденной записи
+            else:
+                logger.warning("Секция 'Публикуемые сведения' не найдена.")
+
+        elif "Сведения о заключении договора" in title:
             lot_numbers = []
             descriptions = []
             agreements = []

@@ -44,6 +44,8 @@ def rename_type_message(message_type):
     if isinstance(message_type, str):
         if "заключении" in message_type.lower():
             return "ДКП"
+        elif "ообщение об отмене" in message_type.lower():
+            return "Сообщение об отмене"
         elif "результ" in message_type.lower():
             return "Результаты торгов"
         elif "оцен" in message_type.lower():
@@ -104,18 +106,25 @@ def delete_org(text):
         return None
     return text
 
+
 def extract_number(text):
+    if not text:
+        return None
     logger.debug(f"Извлечение номера из текста: {text}")
-    match = re.search(r'№(\d+)', text)
+    match = re.search(r'№(\d+) ', text)
     return match.group(1) if match else None
 
 def extract_date(text):
+    if not text:
+        return None
     logger.debug(f"Извлечение даты из текста: {text}")
     match = re.search(r'(\d{2}\.\d{2}\.\d{4})', text)
     return match.group(1) if match else None
 
 def clean_special_chars(text):
     logger.debug(f"Очистка строки от специальных символов: {text}")
+    if text is None:
+        return None
     if isinstance(text, str):
         text = text.replace('\xa0', ' ').replace('\t', ' ')
         text = re.sub(r'[^\x20-\x7Eа-яА-ЯёЁ]', ' ', text).strip()
@@ -125,7 +134,15 @@ def clean_special_chars(text):
 def remove_rows_with_cancelled_messages(data):
     logger.debug("Удаление строк с аннулированными сообщениями")
     pattern = r'аннулир|отмен'
-    result = [row for row in data if not re.search(pattern, row.get("тип_сообщения", ""), re.IGNORECASE)]
+
+    result = [
+        row for row in data
+        if not (
+                re.search(pattern, row.get("тип_сообщения", ""), re.IGNORECASE) and
+                "Сообщение об отмене сообщения об объявлении торгов или сообщения о результатах торгов" not in row.get(
+            "тип_сообщения", "")
+        )
+    ]
     logger.debug(f"Удалено {len(data) - len(result)} строк с аннулированными сообщениями")
     return result
 
