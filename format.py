@@ -9,8 +9,8 @@ def filter_results_before_transfer(data):
         logger.debug("Поиск несостоявшихся торгов в результатах")
         customer_name = data.get("наименование_покупателя", "").lower()
         price = str(data.get("цена", "")).lower()
-        if any(keyword in customer_name for keyword in ["не сост", "несост", "не подан", "за собой"]) or \
-           any(keyword in price for keyword in ["не сост", "несост", "не подан", "за собой"]):
+        if any(keyword in customer_name for keyword in ["не сост", "несост", "не подан", "за собой", "принять залоговое имущество на баланс"]) or \
+           any(keyword in price for keyword in ["не сост", "несост", "не подан", "за собой", "принять залоговое имущество на баланс"]):
             logger.debug(f"Удалено: {data}")
             return None
         logger.info("Несостоявшихся торгов не найдено!")
