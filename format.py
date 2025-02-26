@@ -3,25 +3,20 @@ import re
 from logScript import logger
 from tabulate import tabulate
 
-
 def filter_results_before_transfer(data):
     if "резул" in data.get("тип_сообщения", "").lower():
         logger.debug("Поиск несостоявшихся торгов в результатах")
         customer_name = data.get("наименование_покупателя", "").lower()
         price = str(data.get("цена", "")).lower()
-        if any(keyword in customer_name for keyword in ["не сост", "несост", "не подан", "за собой", "принять залоговое имущество на баланс"]) or \
-           any(keyword in price for keyword in ["не сост", "несост", "не подан", "за собой", "принять залоговое имущество на баланс"]):
+        if any(keyword in customer_name for keyword in ["не сост", "несост", "не подан", "за собой", "принять залоговое имущество на баланс", "ирового соглашения", "не было подано ни одной заявки"]) or \
+           any(keyword in price for keyword in ["не сост", "несост", "не подан", "за собой", "принять залоговое имущество на баланс", "кредитор", "не было подано ни одной заявки", "решение залогодержател"]):
             logger.debug(f"Удалено: {data}")
             return None
         logger.info("Несостоявшихся торгов не найдено!")
     return data
 
 def convert_to_date_only(column):
-    """
-    Преобразует значения столбца в формат дд.мм.гггг.
-    :param column: список, содержащий даты.
-    :return: список, где каждая дата в формате дд.мм.гггг.
-    """
+
     logger.debug("Преобразование дат в формат дд.мм.гггг")
     return [
         x.strftime('%d.%m.%Y') if isinstance(x, datetime.datetime) else

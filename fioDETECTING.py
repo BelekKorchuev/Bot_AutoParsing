@@ -5,14 +5,7 @@ from dotenv import load_dotenv
 from logScript import logger
 from city import process_address
 
-# Загрузка переменных окружения
-load_dotenv(dotenv_path='.env')
 
-db_name = os.getenv("DB_NAME")
-db_user = os.getenv("DB_USER")
-db_password = os.getenv("DB_PASSWORD")
-db_host = os.getenv("DB_HOST")
-db_port = os.getenv("DB_PORT")
 
 # Функции для обработки данных
 def clean_sro(sro_text):
@@ -33,6 +26,20 @@ def au_debtorsDetecting(data):
     # Проверка типа данных, если передан словарь, преобразуем его в список
     if isinstance(data, dict):
         data = [process_address(data)]
+
+    # Загрузка переменных окружения
+    load_dotenv(dotenv_path='.env')
+    logger.info(f"DB_HOST: {os.getenv('DB_HOST')}")
+    logger.info(f"DB_NAME: {os.getenv('DB_NAME')}")
+    logger.info(f"DB_USER: {os.getenv('DB_USER')}")
+    logger.info(f"DB_PASSWORD: {os.getenv('DB_PASSWORD')}")
+    logger.info(f"DB_PORT: {os.getenv('DB_PORT')}")
+
+    db_name = os.getenv("DB_NAME")
+    db_user = os.getenv("DB_USER")
+    db_password = os.getenv("DB_PASSWORD")
+    db_host = os.getenv("DB_HOST")
+    db_port = os.getenv("DB_PORT")
 
     try:
         connection = psycopg2.connect(
@@ -88,6 +95,13 @@ def au_debtorsDetecting(data):
                         (inn_au, clean_fio(raw_fio), arbiter_link, address, sro, email, timezoneCity)
                     )
                     logger.info(f"Добавлена запись в 'arbitr_managers' с ИНН {inn_au}. ФИО_АУ: {raw_fio}")
+                    cursor.execute(
+                        """
+                        INSERT INTO arbitr_previos (ИНН_АУ, ФИО_АУ, ссылка_ЕФРСБ, город_АУ, СРО_АУ, почта_ау, часовой_пояс)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        (inn_au, clean_fio(raw_fio), arbiter_link, address, sro, email, timezoneCity)
+                    )
 
                 # Проверка наличия должника в таблице dolzhnik
                 cursor.execute(
@@ -110,6 +124,15 @@ def au_debtorsDetecting(data):
                             """,
                             (inn_au, message_inn)
                         )
+                        cursor.execute(
+                            """
+                            INSERT INTO debtors_previos (Инн_Должника, Должник_текст, Должник_ссылка_ЕФРСБ, Должник_ссылка_ББ, Номер_дела, Фл_Юл, ЕФРСБ_ББ, АУ_текст, ИНН_АУ, Статус_АУ)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            """,
+                            (message_inn, debtor_name, debtor_link, '', case_number,
+                             'ЮЛ' if len(message_inn) == 10 else 'ФЛ' if len(message_inn) == 12 else '',
+                             'ЕФРСБ', clean_fio(raw_fio), inn_au, 'Новый АУ')
+                        )
                         logger.info(
                             f"Для должника с ИНН {message_inn} обновлен арбитражный управляющий на ИНН {inn_au}. Статус АУ установлен как 'Новый АУ'.")
                     else:
@@ -127,6 +150,18 @@ def au_debtorsDetecting(data):
                     )
                     logger.info(
                         f"Добавлена запись в 'dolzhnik' с ИНН должника {message_inn}. Наименование должника: {debtor_name}")
+
+                    cursor.execute(
+                        """
+                        INSERT INTO debtors_previos (Инн_Должника, Должник_текст, Должник_ссылка_ЕФРСБ, Должник_ссылка_ББ, Номер_дела, Фл_Юл, ЕФРСБ_ББ, АУ_текст, ИНН_АУ)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        (message_inn, debtor_name, debtor_link, '', case_number,
+                         'ЮЛ' if len(message_inn) == 10 else 'ФЛ' if len(message_inn) == 12 else '',
+                         'ЕФРСБ', clean_fio(raw_fio), inn_au)
+                    )
+                    logger.info(f"Добавленна запись в 'debtors_previos' с ИНН должника {message_inn}. Наименование должника: {debtor_name}")
+
 
                 connection.commit()
                 logger.info("Изменения зафиксированы.")
