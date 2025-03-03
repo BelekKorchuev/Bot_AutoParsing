@@ -11,6 +11,14 @@ def ensure_list(data):
     else:
         raise ValueError(f"Ожидались данные в формате dict или list, получено: {type(data)}")
 
+def normalize_separator(value, separator="&&&"):
+    """
+    Удаляет пробелы после разделителя "&&&".
+    """
+    if isinstance(value, str):
+        return value.replace("&&& ", "&&&")  # Убираем пробел после &&&
+    return value
+
 def split_columns(SplitDB):
     """
     Разделяет выбранные столбцы таблицы по заданному разделителю, оставляя остальные столбцы в каждой строке.
@@ -33,6 +41,11 @@ def split_columns(SplitDB):
 
     # Разделяем данные в указанных столбцах
     for row in table:
+        # Приводим данные к правильному формату без пробела после '&&&'
+        for col in columns_to_split:
+            if col in row and row[col]:
+                row[col] = normalize_separator(row[col])
+
         max_len = max(
             len(str(row.get(col, "")).split(separator)) if col in columns_to_split and row.get(col) else 1
             for col in columns_to_split
@@ -48,10 +61,5 @@ def split_columns(SplitDB):
                     new_row[col] = row[col]
             split_data.append(new_row)
 
-
     data = get_massageLots(split_data)
-    # pprint.pprint(data, sort_dicts=False, width=100)
     return data
-
-
-
