@@ -319,11 +319,11 @@ def parse_all_pages_reverse(driver):
 
                                 except Exception as e:
                                     logger.error(f"Ошибка при обработке сообщения: {e}")
-                                    return None
+                                    return False
 
     except Exception as e:
         logger.error(f'Произошла ошибка при парсинге всех страниц: {e}')
-        return None
+        return False
 
 
 # # парсинг всех страниц сверху вниз

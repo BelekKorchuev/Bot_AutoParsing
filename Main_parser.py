@@ -54,7 +54,7 @@ def main():
         # Обход всех страниц при старте
         logger.info("Запускаем полный парсинг всех страниц.")
         pars_sagnal = parse_all_pages_reverse(driver)
-        if pars_sagnal is None:
+        if pars_sagnal is False:
             pop_last_elem()
             # cleanup_virtual_display(driver)
             driver.quit()
