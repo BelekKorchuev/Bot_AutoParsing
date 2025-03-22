@@ -72,7 +72,7 @@ async def process_data_dkp_or_results(data_list, session_maker):
             data['Статус_лота'] = "Новый лот"
 
             # Проверка пустых полей
-            if not is_number(previous_message_number) or not is_number(lot_number):
+            if not is_number(lot_number):
                 logger.info(f"Добавляем в error_table из-за пустого значения: 'Предыдущий_номер_сообщения_по_лот'='{previous_message_number}', 'Номер_лота'='{lot_number}'.")
                 insert_error_table_query = text("""
                     INSERT INTO error_table (
@@ -96,100 +96,7 @@ async def process_data_dkp_or_results(data_list, session_maker):
                 logger.info("Запись добавлена в error_table и пропущена.")
                 continue
 
-            # Логика проверки критериев и обновления данных (Критерии 1, 2, 3)
-            # Критерий 1
-            logger.info(f"Проверяем критерий 1: Предыдущий_номер_сообщения_по_лот='{previous_message_number}', Номер_лота='{lot_number}'.")
-            query_criteria_1 = text("""
-                        SELECT * FROM lots 
-                        WHERE Действующий_номер_сообщения = :previous_message_number 
-                          AND Номер_лота = :lot_number
-                          AND вид_торгов != 'Оценка'
-                    """)
-            result_criteria_1 = await session.execute(query_criteria_1, {
-                'previous_message_number': previous_message_number,
-                'lot_number': lot_number
-            })
-            matching_rows_criteria_1 = result_criteria_1.fetchall()
-            logger.info(f"Критерий 1 найдено совпадений: {len(matching_rows_criteria_1)}.")
-            if matching_rows_criteria_1:
-                data['Статус_лота'] = "На обновление"
 
-            for row in matching_rows_criteria_1:
-                row_data = row._mapping
-                logger.info(f"Переносим строку в delete_lots: {row_data}.")
-                insert_delete_query = text("""
-                            INSERT INTO delete_lots 
-                            SELECT * FROM lots 
-                            WHERE Действующий_номер_сообщения = :previous_message_number 
-                              AND Номер_лота = :lot_number
-                              AND вид_торгов != 'Оценка'
-                        """)
-                await session.execute(insert_delete_query, {
-                    'previous_message_number': row_data['Действующий_номер_сообщения'],
-                    'lot_number': row_data['Номер_лота']
-                })
-
-                delete_query = text("""
-                            DELETE FROM lots 
-                            WHERE Действующий_номер_сообщения = :previous_message_number 
-                              AND Номер_лота = :lot_number
-                              AND вид_торгов != 'Оценка'
-                        """)
-                await session.execute(delete_query, {
-                    'previous_message_number': row_data['Действующий_номер_сообщения'],
-                    'lot_number': row_data['Номер_лота']
-                })
-            await session.commit()
-            logger.info("Критерий 1 обработан.")
-
-            # Критерий 2
-            logger.info(
-                f"Проверяем критерий 2: Предыдущий_номер_сообщения_по_лот='{previous_message_number}', Номер_лота='{lot_number}'.")
-            query_criteria_2 = text("""
-                        SELECT * FROM lots 
-                        WHERE Предыдущий_номер_сообщения_по_лот = :previous_message_number 
-                          AND Номер_лота = :lot_number
-                          AND вид_торгов != 'Оценка'
-                    """)
-            result_criteria_2 = await session.execute(query_criteria_2, {
-                'previous_message_number': previous_message_number,
-                'lot_number': lot_number
-            })
-            matching_rows_criteria_2 = result_criteria_2.fetchall()
-            logger.info(f"Критерий 2 найдено совпадений: {len(matching_rows_criteria_2)}.")
-
-            if matching_rows_criteria_2:
-                data['Статус_лота'] = "На обновление"
-
-            for row in matching_rows_criteria_2:
-                row_data = row._mapping
-                logger.info(f"Переносим строку в delete_lots: {row_data}.")
-                insert_delete_query = text("""
-                            INSERT INTO delete_lots 
-                            SELECT * FROM lots 
-                            WHERE Предыдущий_номер_сообщения_по_лот = :previous_message_number 
-                              AND Номер_лота = :lot_number
-                              AND вид_торгов != 'Оценка'
-                        """)
-                await session.execute(insert_delete_query, {
-                    'previous_message_number': row_data['Предыдущий_номер_сообщения_по_лот'],
-                    'lot_number': row_data['Номер_лота']
-                })
-
-                delete_query = text("""
-                            DELETE FROM lots 
-                            WHERE Предыдущий_номер_сообщения_по_лот = :previous_message_number 
-                              AND Номер_лота = :lot_number
-                              AND вид_торгов != 'Оценка'
-                        """)
-                await session.execute(delete_query, {
-                    'previous_message_number': row_data['Предыдущий_номер_сообщения_по_лот'],
-                    'lot_number': row_data['Номер_лота']
-                })
-            await session.commit()
-            logger.info("Критерий 2 обработан.")
-
-            # Критерий 3
             logger.info(f"Проверяем критерий 3: ИНН_Должника='{case_number}', Номер_лота='{lot_number}'.")
             query_criteria_3 = text("""
                         SELECT * FROM lots 
@@ -222,6 +129,8 @@ async def process_data_dkp_or_results(data_list, session_maker):
                     'lot_number': row_data['Номер_лота']
                 })
 
+                previous_number = matching_rows_criteria_3[0]['Действующий_номер_сообщения']
+
                 delete_query = text("""
                             DELETE FROM lots 
                             WHERE ИНН_Должника = :case_number 
@@ -233,10 +142,11 @@ async def process_data_dkp_or_results(data_list, session_maker):
                     'lot_number': row_data['Номер_лота']
                 })
             await session.commit()
-            logger.info("Критерий 3 обработан.")
+            logger.info("Критерий обработан.")
 
             # Добавление новой строки в lots
             logger.info(f"Добавляем новую строку в lots: {data}.")
+            data["Предыдущий_номер_сообщения_по_лот"] = previous_number if matching_rows_criteria_3 else None
             table_names = ["lots", "previous_lots"]
             for table_name in table_names:
                 insert_query = text(f"""
@@ -253,7 +163,7 @@ async def process_data_dkp_or_results(data_list, session_maker):
                                             :Классификация_имущества, :Цена, :Предыдущий_номер_сообщения_по_лот,
                                             :Дата_публикации_предыдущего_сообщ, :Организатор_торгов, :Торговая_площадка,
                                             :Статус_ДКП, :Статус_сообщения_о_результатах_то, :ЕФРСБ_ББ, :Должник_текст,
-                                            :вид_торгов, :Дата_публикации_сообщения_ДКП, :Дата_публикации_сообщения_о_резул, :Статус_лота
+                                            :вид_торгов, :Дата_публикации_сообщения_ДКП, :Дата_публикации_сообщения_о_резул, :Статус_лота, 
                                         )
                                     """)
                 await session.execute(insert_query, data)
@@ -271,53 +181,7 @@ async def process_data_auction_or_public(data_list, session_maker):
                 lot_number = record['Номер_лота']
                 record['Статус_лота'] = "Новый лот"
 
-                # Логика проверки критериев и обновления данных (Критерии 1, 2)
-                # Критерий 1: Действующий_номер_сообщения и Номер_лота
-                logger.info(
-                    f"Проверяем критерий 1: совпадение по 'Действующий_номер_сообщения' ({current_message_id}) и 'Номер_лота' ({lot_number}).")
-                query_criteria_1 = text("""
-                                    SELECT * FROM lots 
-                                    WHERE Действующий_номер_сообщения = :current_message_id 
-                                      AND Номер_лота = :lot_number
-                                      AND вид_торгов != 'Оценка'
-                                """)
-                result_criteria_1 = await session.execute(query_criteria_1, {
-                    'current_message_id': current_message_id,
-                    'lot_number': lot_number
-                })
-                matching_rows_criteria_1 = result_criteria_1.fetchall()
-                logger.info(
-                    f"Найдено записей по критерию 1 (совпадение по Действующий_номер_сообщения и Номер_лота): {len(matching_rows_criteria_1)}.")
-
-                if matching_rows_criteria_1:
-                    record['Статус_лота'] = "На обновление"
-
-                for row in matching_rows_criteria_1:
-                    logger.info(f"Переносим запись в delete_lots: {row._mapping}")
-                    insert_delete_query = text("""
-                                        INSERT INTO delete_lots 
-                                        SELECT * FROM lots 
-                                        WHERE Действующий_номер_сообщения = :current_message_id 
-                                          AND Номер_лота = :lot_number
-                                          AND вид_торгов != 'Оценка'
-                                    """)
-                    await session.execute(insert_delete_query, {
-                        'current_message_id': row._mapping['Действующий_номер_сообщения'],
-                        'lot_number': row._mapping['Номер_лота']
-                    })
-                    delete_query = text("""
-                                        DELETE FROM lots 
-                                        WHERE Действующий_номер_сообщения = :current_message_id 
-                                          AND Номер_лота = :lot_number
-                                          AND вид_торгов != 'Оценка'
-                                    """)
-                    await session.execute(delete_query, {
-                        'current_message_id': row._mapping['Действующий_номер_сообщения'],
-                        'lot_number': row._mapping['Номер_лота']
-                    })
-
-                # Критерий 2: ИНН_Должника и Номер_лота
-                logger.info(f"Проверяем критерий 2: совпадение по 'ИНН_Должника' ({case_number}) и 'Номер_лота' ({lot_number}).")
+                logger.info(f"Проверяем критерий: совпадение по 'ИНН_Должника' ({case_number}) и 'Номер_лота' ({lot_number}).")
                 query_criteria_2 = text("""
                                     SELECT * FROM lots 
                                     WHERE ИНН_Должника = :case_number 
@@ -330,10 +194,11 @@ async def process_data_auction_or_public(data_list, session_maker):
                 })
                 matching_rows_criteria_2 = result_criteria_2.fetchall()
                 logger.info(
-                    f"Найдено записей по критерию 2 (совпадение по ИНН_Должника и Номер_лота): {len(matching_rows_criteria_2)}.")
+                    f"Найдено записей по критерию (совпадение по ИНН_Должника и Номер_лота): {len(matching_rows_criteria_2)}.")
 
                 if matching_rows_criteria_2:
                     record['Статус_лота'] = "На обновление"
+                    previous_number = matching_rows_criteria_2[0]['Действующий_номер_сообщения']
 
                 for row in matching_rows_criteria_2:
                     logger.info(f"Переносим запись в delete_lots: {row._mapping}")
@@ -358,6 +223,8 @@ async def process_data_auction_or_public(data_list, session_maker):
                         'case_number': row._mapping['ИНН_Должника'],
                         'lot_number': row._mapping['Номер_лота']
                     })
+
+                record["Предыдущий_номер_сообщения_по_лот"] = previous_number if matching_rows_criteria_2 else None
 
                 # Добавление новой строки в lots
                 logger.info(f"Добавляем новую строку в lots: {record}.")
@@ -431,45 +298,8 @@ async def process_data_evaluation(data_list, session_maker):
                 case_number = data['ИНН_Должника']
                 message_type = data['вид_торгов']
 
-                # Критерий 1: Действующий_номер_сообщения и Имущество
-                query_criteria_1 = text("""
-                    SELECT * FROM lots
-                    WHERE Действующий_номер_сообщения = :current_message_id
-                      AND Имущество = :lot_property
-                      AND вид_торгов = 'Оценка'
-                """)
-                result_criteria_1 = await session.execute(query_criteria_1, {
-                    'current_message_id': current_message_id,
-                    'lot_property': lot_property
-                })
-                matching_rows_criteria_1 = result_criteria_1.fetchall()
-                logger.info(f"Найдено записей по критерию 1 (Действующий_номер_сообщения и Имущество): {len(matching_rows_criteria_1)}.")
 
-                for row in matching_rows_criteria_1:
-                    logger.info(f"Переносим запись в delete_lots: {row._mapping}")
-                    insert_delete_query = text("""
-                        INSERT INTO delete_lots
-                        SELECT * FROM lots
-                        WHERE Действующий_номер_сообщения = :current_message_id
-                          AND Имущество = :lot_property
-                          AND вид_торгов = 'Оценка'
-                    """)
-                    await session.execute(insert_delete_query, {
-                        'current_message_id': row._mapping['Действующий_номер_сообщения'],
-                        'lot_property': row._mapping['Имущество']
-                    })
-                    delete_query = text("""
-                        DELETE FROM lots
-                        WHERE Действующий_номер_сообщения = :current_message_id
-                          AND Имущество = :lot_property
-                          AND вид_торгов = 'Оценка'
-                    """)
-                    await session.execute(delete_query, {
-                        'current_message_id': row._mapping['Действующий_номер_сообщения'],
-                        'lot_property': row._mapping['Имущество']
-                    })
-
-                # Критерий 2: вид_торгов, ИНН_Должника и Имущество
+                # Критерий 1: вид_торгов, ИНН_Должника и Имущество
                 query_criteria_2 = text("""
                     SELECT * FROM lots
                     WHERE вид_торгов = :вид_торгов
@@ -483,6 +313,10 @@ async def process_data_evaluation(data_list, session_maker):
                 })
                 matching_rows_criteria_2 = result_criteria_2.fetchall()
                 logger.info(f"Найдено записей по критерию 2 (вид_торгов, ИНН_Должника и Имущество): {len(matching_rows_criteria_2)}.")
+
+                if matching_rows_criteria_2:
+                    previous_number = matching_rows_criteria_2[0]['Действующий_номер_сообщения']
+
 
                 for row in matching_rows_criteria_2:
                     logger.info(f"Переносим запись в delete_lots: {row._mapping}")
@@ -509,6 +343,8 @@ async def process_data_evaluation(data_list, session_maker):
                         'case_number': row._mapping['ИНН_Должника'],
                         'lot_property': row._mapping['Имущество']
                     })
+
+                data["Предыдущий_номер_сообщения_по_лот"] = previous_number if matching_rows_criteria_2 else None
 
                 # Добавление новой строки в lots
                 logger.info(f"Добавляем новую строку в lots: {data}.")
@@ -550,7 +386,7 @@ async def main(data_list):
             continue
 
         massage_type = data.get('вид_торгов')
-        if massage_type in ['ДКП', 'Результаты торгов']:
+        if massage_type in ['ДКП', 'Результат торгов']:
             logger.info(f"Вид торгов: {massage_type}")
             await process_data_dkp_or_results([data], session_maker)
         elif massage_type in ['Аукцион', 'Публичка']:

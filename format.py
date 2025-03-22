@@ -42,7 +42,7 @@ def rename_type_message(message_type):
         elif "ообщение об отмене" in message_type.lower():
             return "Сообщение об отмене"
         elif "результ" in message_type.lower():
-            return "Результаты торгов"
+            return "Результат торгов"
         elif "оцен" in message_type.lower():
             return "Оценка"
         elif "публич" in message_type.lower():
@@ -240,6 +240,8 @@ def get_massageLots(lots):
     cleaned_data = []  # Новый список для отфильтрованных данных
 
     for record in data:
+        if "не" in record.get("ИНН"):
+            continue
         if record.get('арбитр_ссылка'):
             if delete_org(record['арбитр_ссылка']) is None:
                 # Если delete_org вернул None, значит ссылка содержит PrsTOCard или OrgToCard

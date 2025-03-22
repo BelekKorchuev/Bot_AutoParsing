@@ -120,7 +120,7 @@ def prepare_data_for_db(raw_data):
 
         'номер_сообщения': message_number,
         'дата_публикации': publication_date,
-        'наименование_должника': debtor_name,
+        'наименоinnвание_должника': debtor_name,
         'адрес ': address,
         'ОГРН': ogrn,
         'ИНН': inn,
@@ -244,7 +244,13 @@ def insert_message_to_db(data):
         new_id = cursor.fetchone()[0]
         logger.info(f"Данные успешно вставлены с ID: {new_id}")
     except Exception as e:
-        logger.error("Ошибка при выполнении запроса:", e)
-        conn.rollback()
+        if 'duplicate key value violates unique constraint' in str(e) and 'номер_сообщения' in str(e):
+            logger.warning(f"Строка с номером сообщения уже существует. Пропуск.")
+            cursor.close()
+            conn.close()
+            return None
+        else:
+            logger.error("Ошибка при выполнении запроса:", e)
+            conn.rollback()
     finally:
         cursor.close()

@@ -235,39 +235,35 @@ def parse_message_page(url, driver):
             text_section = soup.find_all('div', class_='msg')
             data['текст'] = "; ".join(text.text.strip() for text in text_section if text.text.strip())
 
-            lot_numbers = []
-            lot_descriptions = []
-            lot_prices = []
-            lot_classification = []
+            lot_table = soup.find('table', class_='lotInfo')
+            if lot_table:
+                header_row = lot_table.find_all('tr')[0]
+                headers = [th.text.strip() for th in header_row.find_all('th')]
+                lot_rows = lot_table.find_all('tr')[1:]
 
-            lot_tablet = soup.find('table', class_='lotInfo')
-            if lot_tablet:
-                lot_rows = lot_tablet.find_all('tr')[1:]
+                collected_values = {
+                    'Номер лота': [],
+                    'Описание': [],
+                    'Начальная цена, руб': [],
+                    'Классификация имущества': []
+                }
+
                 for row in lot_rows:
                     cells = row.find_all('td')
-
-                    try:
-                        lot_numbers.append(cells[0].text.strip())  # Номер лота
-                    except IndexError:
-                        lot_numbers.append("")
-                    try:
-                        lot_descriptions.append(cells[1].text.strip())  # Описание
-                    except IndexError:
-                        lot_descriptions.append("")
-                    try:
-                        lot_prices.append(cells[2].text.strip())  # Начальная цена, руб
-                    except IndexError:
-                        lot_prices.append("")
-                    try:
-                        lot_classification.append(cells[6].text.strip())  # Классификация имущества
-                    except IndexError:
-                        lot_classification.append("")
+                    for header in collected_values.keys():
+                        if header in headers:
+                            index = headers.index(header)
+                            if index < len(cells):
+                                value = cells[index].text.strip()
+                            else:
+                                value = ""
+                            collected_values[header].append(value)
 
                 data.update({
-                    'Номер лота': "&&& ".join(lot_numbers),
-                    'Описание': "&&& ".join(lot_descriptions),
-                    'Цена': "&&& ".join(lot_prices),
-                    'Классификация': "&&& ".join(lot_classification),
+                    'Номер лота': "&&& ".join(collected_values['Номер лота']),
+                    'Описание': "&&& ".join(collected_values['Описание']),
+                    'Цена': "&&& ".join(collected_values['Начальная цена, руб']),
+                    'Классификация': "&&& ".join(collected_values['Классификация имущества'])
                 })
 
             agreements = []  # Для хранения сведений о заключении договоров

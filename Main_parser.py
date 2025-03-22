@@ -56,7 +56,7 @@ def main():
         pars_sagnal = parse_all_pages_reverse(driver)
         if pars_sagnal is None:
             pop_last_elem()
-            cleanup_virtual_display(driver)
+            # cleanup_virtual_display(driver)
             driver.quit()
             continue
 
